@@ -1,0 +1,21 @@
+command line options
+
+-h help
+
+-H Hash size
+
+-l set the listen ip address
+
+-m Map address <a1> to <a2> when sending it to clients\n"
+	Add an unresolved address mapping to the list
+	mapping must be of the form "addr1:port1=addr2:port2", ":portX" are optional
+	eg... 
+	     kingpin-master.exe -m "192.168.1.121=110.175.51.202" -m "192.168.1.123=kp.servegame.com" 
+
+-n Maximum number of servers
+
+-p Port number (kp1)
+
+-q Port number (kpq3)
+
+-v Verbose level, up to 4 (default: 4; no value means max)"
