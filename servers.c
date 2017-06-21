@@ -86,19 +86,14 @@ static server_t *Sv_RemoveAndGetNextPtr(server_t * sv, server_t ** prev)
 {
 	nb_servers--;
 	MsgPrint(MSG_NORMAL,
-			 "%s:%hu timed out; %u servers currently registered\n",
+			 "%s:%hu ----  timed out ( %u servers registered )\n",
 			 inet_ntoa(sv->address.sin_addr), ntohs(sv->address.sin_port), nb_servers);
 
 	// Mark this structure as "free"
 	sv->active = qfalse;
 
-//	Sv_GetNext
-	//	for (sv = Sv_GetFirst(); /* see below */; sv = Sv_GetNext())
-	
 	*prev = sv->next;
-	 //sv->next = *prev;
 	return sv->next;
-	//return Sv_GetNext;
 }
 
 
@@ -398,7 +393,7 @@ Sv_GetByAddr
 Search for a particular server in the list; add it if necessary
 ====================
 */
-server_t       *Sv_GetByAddr(const struct sockaddr_in * address, qboolean add_it)
+server_t       *Sv_GetByAddr(const struct sockaddr_in *address, qboolean add_it)
 {
 	server_t      **prev, *sv;
 	unsigned int    hash;
@@ -421,9 +416,9 @@ server_t       *Sv_GetByAddr(const struct sockaddr_in * address, qboolean add_it
 		// We check the timeout values while browsing this list
 		if(sv->timeout < crt_time)
 		{
-			MsgPrint(MSG_WARNING, "%s timeout saved:%d cur:%d\n", peer_address, sv->timeout, crt_time); // hash
+													//hypo long long int
+			MsgPrint(MSG_WARNING, "%s ---- timeout STORED:%lld TIME:%lld\n", peer_address, sv->timeout, crt_time); // hash
 			sv = Sv_RemoveAndGetNextPtr(sv, prev);
-
 			continue;
 		}
 
@@ -432,7 +427,7 @@ server_t       *Sv_GetByAddr(const struct sockaddr_in * address, qboolean add_it
 		{
 			// Put it on top of the list (it's useful because heartbeats
 			// are almost always followed by infoResponses)
-			MsgPrint(MSG_DEBUG, "%s --- Existing server in database\n", peer_address /*, sv->address.sin_addr.S_un.S_addr, sv->address.sin_port*/);
+			MsgPrint(MSG_DEBUG, "%s:%hu ---- Existing server in database\n",/*peer_address*/ inet_ntoa(sv->address.sin_addr), ntohs(sv->address.sin_port));
 
 			*prev = sv->next;
 			sv->next = hash_table[hash];
@@ -538,32 +533,15 @@ server_t       *Sv_GetNext(void)
 			return NULL;
 
 		// If the new current server has timed out, remove it
-		if (crt_server->timeout < crt_time){
-			MsgPrint(MSG_DEBUG, "timed outxx server %s \n", crt_server);
-
+		if (crt_server->timeout < crt_time)
 			crt_server = Sv_RemoveAndGetNextPtr(crt_server, prev_pointer);
-
-		}
 		else
 			return crt_server;
 	}
 }
 
-#if 0
-//hypov8 set server details here??
-void Sv_SetTimeout(const struct sockaddr_in *address, int timeToAdd)
-{
-	server_t      *sv;
-	unsigned int    hash;
-
-	hash = Sv_AddressHash(address);
-	sv = hash_table[hash];
-
-	sv->timeout = crt_time + timeToAdd;
 
 
-}
-#endif
 // ---------- Public functions (address mappings) ---------- //
 
 /*

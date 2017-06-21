@@ -37,94 +37,87 @@
 
 // ---------- Constants ---------- //
 
+////////////////
+//   global   //
+////////////////
+
 // Timeouts (in secondes)
 #define TIMEOUT_HEARTBEAT		320 //kingpin default 300
-#define TIMEOUT_INFORESPONSE	(15 * 60)
+#define TIMEOUT_INFORESPONSE	10	//seconds
 
 // Period of validity for a challenge string (in secondes)
 #define TIMEOUT_CHALLENGE 3
 
 //hypov8 allow a bit of time for ping responce
-#define TIMEOUT_PING 10
+#define TIMEOUT_PING 5
 
 // Maximum size of a reponse packet
 #define MAX_PACKET_SIZE 1400
 
 
-// Types of messages (with samples):
+////////////////
+//  kp stuff  //
+////////////////
 
+// server to master
+#define S2M_HEARTBEAT			"\\heartbeat\\"			//heartbeat GS packet
+#define S2M_HEARTBEAT_YYYY		"ÿÿÿÿheartbeat\n"		//heartbeat game port
+#define S2M_GAMENAME_KINGPIN	"\\gamename\\kingpin"	//gamename GS packet
+#define S2M_SHUTDOWN_YYYY		"ÿÿÿÿshutdown"			//shutdown, server change, map etc
+#define S2M_ACK_YYYY			"ÿÿÿÿack"				//recieved ack 
+#define S2M_PING_YYYY			"ÿÿÿÿping"				//recieved ping (initilized server...)
+#define S2M_PRINT_YYYY			"ÿÿÿÿprint\n"			//recieved print (after sending status...)
+#define S2M_ERROR_STR			"Info string length exceeded\n" //fix strings to long. game port send limitation
 
-//#define S2M_HEARTBEAT "heartbeat Kingpin-1" //hypo kp1
-#define S2M_HEARTBEAT		"\\heartbeat\\" //hypo kp1
-#define S2M_HEARTBEAT_YYYY	"ÿÿÿÿheartbeat\n" //hypo kp1
-#define S2M_GAMENAME		"gamename\\kingpin" //hypo kp1
-#define S2M_SHUTDOWN_YYYY	"ÿÿÿÿshutdown"		//kingpin1 master shutdown, server change, map etc
-#define S2M_ACK_YYYY		"ÿÿÿÿack"			//recieved ack 
-#define S2M_PING_YYYY		"ÿÿÿÿping"			//recieved ping (initilized server...)
-#define S2M_PRINT_YYYY		"ÿÿÿÿprint\n"			//recieved print (after sending status...)
-#define S2M_ERROR_STR		"Info string length exceeded\n"
+// master to server
+#define M2S_GETINFO			"\\status\\"	//send getinfo GS packet
+#define M2S_GETINFO_YYYY	"ÿÿÿÿstatus\n"	//send getinfo game port
+#define M2S_PING_YYYY		"ÿÿÿÿping\n"	//send ping, hoping to recieve ack
+#define M2S_ACK_YYYY		"ÿÿÿÿack\n"		//server sent ping, reponce with an ack
 
-// "getinfo A_Challenge"
-#define M2S_GETINFO "\\status\\" //hypov8 kpq3 "getinfo"
-#define M2S_GETINFO_YYYY "ÿÿÿÿstatus\n" //hypov8 kpq3 "getinfo"
-#define M2S_PING_YYYY "ÿÿÿÿping\n"	// send ping, hoping to recieve ack
-#define M2S_ACK_YYYY  "ÿÿÿÿack\n"	//server sent ping, reponce with an ack
-
-
-// "infoResponse\n\\pure\\1\\..."
-#define S2M_INFORESPONSE "infoResponse\x0A"
-
-// "getservers 68 empty full"
-#define C2M_GETSERVERS "getservers Kingpin-1" //hypo kp1
-
-//gamespy browser requests
-#define B2M_INITCONTACT			"\\gamename\\gspylite\\" 
+//gamespy browser to master
+#define B2M_INITALCONTACT		"\\gamename\\gspylite\\" //inital contact
 #define B2M_GETSERVERS			"\\list\\" 
-//#define B2M_GETSERVERS_GSLIST	"\\&\\\x1\x3\\\\\\\\kingpin\\gslive\\"
 #define B2M_GETSERVERS_GSLIST2 "\\gamename\\gamespy2\\"
-
+//#define B2M_GETSERVERS_GSLIST	"\\&\\\x1\x3\\\\\\\\kingpin\\gslive\\"
+//#define B2M_GETSERVERS_LIST "\\list\\\\gamename\\""
 //87.175.221.101:61916 --->invalid GameSpy(\gamename\gamespy2\gamever\20603020\enctype\0\validate\Up
 //kV3Mfn\final\\list\cmp\gamename\kps)
+// "\x00&\x00\x01\x03\x00\x00\x00\x00kingpin\x00gslive\""
 
- // "\x00&\x00\x01\x03\x00\x00\x00\x00kingpin\x00gslive\""
-
-
+//master to gamespy browser
 #define M2B_ECHOREPLY	"\\basic\\\\secure\\TXKOAT" //echo reply to gamespy
 
-
-// "getserversResponse\\...(6 bytes)...\\...(6 bytes)...\\EOT\0\0\0"
-#define M2C_GETSERVERSREPONSE "getserversResponse"
-
+//motd
 #define C2M_GETMOTD "getmotd"
 #define M2C_MOTD    "motd "
 
 
 
+////////////////
+// kpq3 stuff //
+////////////////
 
+//server to master
+#define S2M_HEARTBEAT_KPQ3		"heartbeat KingpinQ3-1" // "heartbeat Kingpinq3\n"
+#define S2M_HEARTBEAT_DP		"heartbeat DarkPlaces"	// more accepted protocol name at other masters
+#define S2M_INFORESPONSE_KPQ3	"infoResponse\x0A"		// "infoResponse\n\\pure\\1\\..."
+#define S2M_FLATLINE_KPQ3			"heartbeat"			//kill kpq3 server
+//#define S2M_FLATLINE			"KPQ3Flatline-1"		//kill kpq3 server
 
-///kpq3 stuff
+//mster to server
+#define M2S_GETINFO_KPQ3		"getinfo"				// "getinfo A_Challenge"
 
-// "heartbeat Kingpinq3\n"
-#define S2M_HEARTBEAT_KPQ3	"heartbeat KingpinQ3-1"
-#define S2M_HEARTBEAT_DP	"heartbeat DarkPlaces" // more accepted protocol name at other masters
+//ingame browser to master
+#define C2M_GETSERVERS_KPQ3		"getservers KingpinQ3-1"	// "getservers KingpinQ3-1 68 empty full"
+#define C2M_GETSERVERS2_KPQ3	"getservers "				// "getservers 68 empty full"				// not using darkplaces protocol
+#define C2M_GETMOTD_KPQ3		"getmotd"
 
-// "getinfo A_Challenge"
-#define M2S_GETINFO_KPQ3	"getinfo"
+//master to ingame browser
+#define M2C_GETSERVERSREPONSE_KPQ3 "getserversResponse" // "getserversResponse\\...(6 bytes)...\\...(6 bytes)...\\EOT\0\0\0"
 
-// "infoResponse\n\\pure\\1\\..."
-#define S2M_INFORESPONSE_KPQ3	"infoResponse\x0A"
-
-// "getservers 68 empty full"
-#define C2M_GETSERVERS_KPQ3		"getservers KingpinQ3-1"
-#define C2M_GETSERVERS2_KPQ3	"getservers " // if not using darkplaces protocol
-
-// "getserversResponse\\...(6 bytes)...\\...(6 bytes)...\\EOT\0\0\0"
-#define M2C_GETSERVERSREPONSE_KPQ3 "getserversResponse"
-
-#define C2M_GETMOTD_KPQ3 "getmotd"
-#define M2C_MOTD_KPQ3    "motd "
-
-
+#define M2C_CHALLENGE_KEY	"challenge\\"
+#define M2C_MOTD_KEY		"motd\\"
 
 // ---------- Private functions ---------- //
 
@@ -232,23 +225,37 @@ static const char *BuildChallenge(void)
 
 /*
 ====================
-SendGetInfo
+SendGetStatusKingpin
 
-Send a "getinfo" message to a server
+Send a //status// message to a kp server on udp gamespy port
 ====================
 */
-static void SendGetStatus(server_t * server)
+static void SendGetStatusKingpin(server_t * server)
 {
 	int netfail;
 	char            msg[64] =  M2S_GETINFO;
 
+	struct sockaddr_in tmpServerAddress;
+	u_short port;
+
+	memcpy(&tmpServerAddress, &server->address, sizeof(server->address));
+	port = ntohs(tmpServerAddress.sin_port);
+	port -= 10;
+	tmpServerAddress.sin_port = htons(port);
+
 	strncat(msg, server->challenge, sizeof(msg) - strlen(msg) - 1);
-	if (sendto(outSock, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)))
-		fprintf(stderr, "%s <--- 'status'\n", peer_address);
+
+	//gs port
+	if (sendto(outSock, msg, strlen(msg), 0, (struct sockaddr *)&tmpServerAddress, sizeof(tmpServerAddress)))
+		MsgPrint(MSG_WARNING,"%s:%hu <--- '\\\\status\\\\' ( GameSpy Port )\n", inet_ntoa(tmpServerAddress.sin_addr), ntohs(tmpServerAddress.sin_port));
+	//kp port
+	//if (sendto(outSock, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)))
+		//fprintf(stderr, "%s <--- 'status'\n", peer_address);
 
 	netfail = WSAGetLastError();
 	if (netfail)
 		MsgPrint(MSG_DEBUG, "%s <--- 'status'--== WSAGetLastError ==-- \"%i\"\n", peer_address, netfail);
+
 }
 
 /*
@@ -268,13 +275,7 @@ static void SendGetInfo(server_t * server)
 		strncpy(server->challenge, BuildChallenge(), sizeof(server->challenge) - 1);
 		server->challenge_timeout = crt_time + TIMEOUT_CHALLENGE;
 	}
-	//server->address.sin_port = 31620;
-#if 0 //hypo test local ip
-	server->address.sin_addr.S_un.S_un_b.s_b1 = 110;
-	server->address.sin_addr.S_un.S_un_b.s_b2 = 175;
-	server->address.sin_addr.S_un.S_un_b.s_b3 = 51;
-	server->address.sin_addr.S_un.S_un_b.s_b4 = 202;
-#endif
+
 	strncat(msg, server->challenge, sizeof(msg) - strlen(msg) - 1);
 	if (sendto(outSock, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)))
 		MsgPrint(MSG_DEBUG, "%s <--- 'YYYYstatus'\n", peer_address);
@@ -289,7 +290,7 @@ static void SendGetInfo(server_t * server)
 ====================
 SendGetInfo
 
-Send a "getinfo" message to a server
+Send a "getinfo" message to a KPQ3 server
 ====================
 */
 static void SendGetInfoKPQ3(server_t * server)
@@ -339,7 +340,38 @@ static void SendAck(server_t * server)
 	if (netfail)
 		MsgPrint(MSG_DEBUG, "%s <--- 'Ping'--== WSAGetLastError ==-- \"%i\"\n", peer_address, netfail);
 
+}
 
+char *fixStringToLongError(const char* msg)
+{
+	int i;
+	char *out;
+
+	out = (char*)msg;
+	/* fix for info strings to long in kp1 */
+	for (i = 0; i < 5; i++) //loop 5 times. should be pleanty
+	{
+		if (!strncmp(S2M_ERROR_STR, out, strlen(S2M_ERROR_STR)))
+		{
+			//strcpy(out, &out[strlen(S2M_ERROR_STR)]);
+			out = out + strlen(S2M_ERROR_STR);
+			continue;
+		}
+		break;
+	}
+	return out;
+
+	/*		fix for info strings to long in kp1 
+	for (i = 0; i < 5; i++) //loop 5 times. should be pleanty
+	{
+		if (!strncmp(S2M_ERROR_STR, msg, strlen(S2M_ERROR_STR)))
+		{
+			strcpy((char*)msg, &msg[strlen(S2M_ERROR_STR)]);
+			continue;
+		}
+		break;
+	}
+	*/
 }
 
 /*
@@ -349,34 +381,23 @@ HandleGetServers
 Parse getservers requests and send the appropriate response
 ====================
 */
-static void HandleGetServers(const char *msg, const struct sockaddr_in *addr, int isTCP, const char* challenge)
+static void HandleGetServers(const struct sockaddr_in *addr, int isTCP, const char* challenge)
 {
 	const char     *packetheader = "";
 	const size_t    headersize = strlen(packetheader);
 	char            packet[MAX_PACKET_SIZE];
 	size_t          packetind;
 	server_t       *sv;
-	unsigned int    protocol;
 	unsigned long    sv_addr;
 	char			*char_sv_addr;
 	char			tmp_packet[30];
 	unsigned short  sv_port;
 	qboolean        no_empty;
 	qboolean        no_full;
+	qboolean		isKingpin;
 	unsigned int    numServers = 0;
 	char * challengeTmp;
-
-	//new
-	//unsigned char  *dest;
-	//char *gamename = "QFWxY2";
-
-	//int buflen = 0;
 	unsigned char buff[6];
-	////////
-
-	// Check if there's a name before the protocol number
-	// In this case, the message comes from a DarkPlaces-compatible client
-	protocol = atoi(msg);
 
 	challengeTmp = "GameSpy";
 	if (challenge)
@@ -405,6 +426,8 @@ static void HandleGetServers(const char *msg, const struct sockaddr_in *addr, in
 			strcat(packet, "\\final\\");
 
 
+			MsgPrint(MSG_DEBUG, "- Sending servers: %s\n", packet);
+
 			// Send the packet to the client
 			if (isTCP)
 				sendto(tmpClientOut_tcp, packet, strlen(packet), 0, (const struct sockaddr *)addr, sizeof(*addr));
@@ -414,6 +437,7 @@ static void HandleGetServers(const char *msg, const struct sockaddr_in *addr, in
 				
 			if (max_msg_level <= MSG_NORMAL) //hypov8 print if no debug 
 				MsgPrint(MSG_NORMAL, "%s ---> getservers ( %s ) Servers: %u\n", peer_address, challengeTmp, numServers); //%d, protocol
+			
 			MsgPrint(MSG_DEBUG, "%s <--- getserversResponse (%u servers)\n", peer_address, numServers);
 
 			// If we're done
@@ -449,11 +473,13 @@ static void HandleGetServers(const char *msg, const struct sockaddr_in *addr, in
 
 #if 1 //hypov8 allow all servers in gamespy. kp1 + kpq3
 		// Check protocol, options
+		isKingpin = qfalse;
 		if (challenge)
 		{
 			_strlwr((char*)challenge);
 			if (!strncmp(challenge, "kingpin", strlen(challenge)))
 			{
+				isKingpin = qtrue;
 				if (sv->protocol != 32)
 					continue;
 			}
@@ -468,10 +494,11 @@ static void HandleGetServers(const char *msg, const struct sockaddr_in *addr, in
 				if (!(sv->protocol == 74 || sv->protocol == 75))
 					continue;
 			}
+			else
+				continue;
 		}
-
-		//if (sv->protocol != 32 )
-			//continue;	// Skip it
+		else
+			continue; //shouldent need
 #endif
 
 		if (isTCP == 2)
@@ -504,14 +531,21 @@ static void HandleGetServers(const char *msg, const struct sockaddr_in *addr, in
 		}
 		else
 		{
-			sprintf(tmp_packet, "\\ip\\%s:%i", char_sv_addr, sv_port - 10); //-10 send query port to clients
+			if( isKingpin)
+				sprintf(tmp_packet, "\\ip\\%s:%i", char_sv_addr, sv_port - 10); //-10 send query port to clients
+			else
+				sprintf(tmp_packet, "\\ip\\%s:%i", char_sv_addr, sv_port);
 
 			strcat(packet, tmp_packet);
 			packetind += sizeof(tmp_packet);
-
-			MsgPrint(MSG_DEBUG, "  - Sending server %u.%u.%u.%u:%hu\n",
+#if 0
+			MsgPrint(MSG_DEBUG, "- Sending server %u.%u.%u.%u:%hu\n",
 				(qbyte)packet[packetind], (qbyte)packet[packetind + 1],
 				(qbyte)packet[packetind + 2], (qbyte)packet[packetind + 3], sv_port);
+#else
+			//MsgPrint(MSG_DEBUG, "- Sending server: %s\n", packet);
+#endif
+
 		}
 		numServers++;
 	}
@@ -520,14 +554,14 @@ static void HandleGetServers(const char *msg, const struct sockaddr_in *addr, in
 
 /*
 ====================
-HandleGetServers
+HandleGetServersKPQ3
 
 Parse getservers requests and send the appropriate response
 ====================
 */
 static void HandleGetServersKPQ3(const char *msg, const struct sockaddr_in *addr)
 {
-	const char     *packetheader = "\xFF\xFF\xFF\xFF" M2C_GETSERVERSREPONSE "\\";
+	const char     *packetheader = "\xFF\xFF\xFF\xFF" M2C_GETSERVERSREPONSE_KPQ3 "\\";
 	const size_t    headersize = strlen(packetheader);
 	char            packet[MAX_PACKET_SIZE];
 	size_t          packetind;
@@ -546,11 +580,14 @@ static void HandleGetServersKPQ3(const char *msg, const struct sockaddr_in *addr
 	if (max_msg_level >= MSG_DEBUG) //hypov8 print b4 debug stuff below
 		MsgPrint(MSG_NORMAL, "%s ---> getservers ( KPQ3 protocol %d )\n", peer_address, protocol);
 
+	// hypo must exist to show all servers
 	no_empty = (strstr(msg, "empty") == NULL);
-	no_full = (strstr(msg, "full") == NULL);
+	no_full =  (strstr(msg, "full") == NULL);
 
 	// Initialize the packet contents with the header
 	packetind = headersize;
+	// hypo zero packet
+	memset(packet, 0, sizeof(packet));
 	memcpy(packet, packetheader, headersize);
 
 	// Add every relevant server
@@ -570,7 +607,7 @@ static void HandleGetServersKPQ3(const char *msg, const struct sockaddr_in *addr
 
 			// Send the packet to the client
 			sendto(inSock, packet, packetind, 0, (const struct sockaddr *)addr, sizeof(*addr));
-
+			
 			if (max_msg_level <= MSG_NORMAL) //hypov8 print if no debug 
 				MsgPrint(MSG_NORMAL, "%s ---> getservers ( KPQ3 protocol %d ) Servers: %i\n", peer_address, protocol, numServers);
 
@@ -605,11 +642,7 @@ static void HandleGetServersKPQ3(const char *msg, const struct sockaddr_in *addr
 
 		// Check protocol, options
 		if (sv->protocol != protocol || (sv->nbclients == 0 && no_empty) || (sv->nbclients == sv->maxclients && no_full))
-		{
-
-			// Skip it
-			continue;
-		}
+			continue;	// Skip it
 
 		// Use the address mapping associated with the server, if any
 		if (sv->addrmap != NULL)
@@ -620,8 +653,7 @@ static void HandleGetServersKPQ3(const char *msg, const struct sockaddr_in *addr
 			if (addrmap->to.sin_port != 0)
 				sv_port = ntohs(addrmap->to.sin_port);
 
-			MsgPrint(MSG_DEBUG,
-				"Server address mapped to %u.%u.%u.%u:%hu\n",
+			MsgPrint(MSG_DEBUG,	"Server address mapped to %u.%u.%u.%u:%hu\n",
 				sv_addr >> 24, (sv_addr >> 16) & 0xFF, (sv_addr >> 8) & 0xFF, sv_addr & 0xFF, sv_port);
 		}
 
@@ -638,13 +670,17 @@ static void HandleGetServersKPQ3(const char *msg, const struct sockaddr_in *addr
 		// Trailing '\'
 		packet[packetind + 6] = '\\';
 
-		MsgPrint(MSG_DEBUG, "  - Sending server %u.%u.%u.%u:%hu\n",
+#if 0
+		MsgPrint(MSG_DEBUG, "- Sending server %u.%u.%u.%u:%hu\n", 
 			(qbyte)packet[packetind], (qbyte)packet[packetind + 1],
 			(qbyte)packet[packetind + 2], (qbyte)packet[packetind + 3], sv_port);
-
+#else
+		MsgPrint(MSG_DEBUG, "- Sending server: %s\n", packet);
+#endif
 		packetind += 7;
 		numServers++;
 	}
+
 }
 
 
@@ -699,8 +735,7 @@ static void HandleInfoResponse(server_t * server, const char *msg)
 		server->nbclients = (unsigned short)atoi(value);
 
 	// Set a new timeout
-	//Sv_SetTimeout(address, TIMEOUT_PING);
-	server->timeout = crt_time + TIMEOUT_INFORESPONSE;
+	server->timeout = crt_time + TIMEOUT_HEARTBEAT;
 }
 
 /*
@@ -727,7 +762,7 @@ static void HandleInfoResponseKPQ3(server_t * server, const char *msg)
 	value = SearchInfostring(msg, "challenge");
 	if (!value || strcmp(value, server->challenge))
 	{
-		MsgPrint(MSG_ERROR, "ERROR: invalid challenge from %s (%s)\n", peer_address, value);
+		MsgPrint(MSG_ERROR, "%s ---> ERROR: invalid challenge=%s(%s)\n", peer_address, value, server->challenge);
 		return;
 	}
 
@@ -754,12 +789,9 @@ static void HandleInfoResponseKPQ3(server_t * server, const char *msg)
 		server->nbclients = (unsigned short)atoi(value);
 
 	// Set a new timeout
-	server->timeout = crt_time + TIMEOUT_INFORESPONSE;
+	server->timeout = crt_time + TIMEOUT_HEARTBEAT;
 }
 
-
-#define CHALLENGE_KEY "challenge\\"
-#define MOTD_KEY      "motd\\"
 
 /*
 ====================
@@ -768,7 +800,7 @@ HandleGetMotd
 Parse getservers requests and send the appropriate response
 ====================
 */
-static void HandleGetMotd(const char *msg, const struct sockaddr_in *addr)
+static void HandleGetMotd(const char *msg, const struct sockaddr_in *addr) //todo: test
 {
 	const char     *packetheader = "\xFF\xFF\xFF\xFF" M2C_MOTD "\"";
 	const size_t    headersize = strlen(packetheader);
@@ -811,15 +843,15 @@ static void HandleGetMotd(const char *msg, const struct sockaddr_in *addr)
 	packetind = headersize;
 	memcpy(packet, packetheader, headersize);
 
-	strncpy(&packet[packetind], CHALLENGE_KEY, MAX_PACKET_SIZE - packetind - 2);
-	packetind += strlen(CHALLENGE_KEY);
+	strncpy(&packet[packetind], M2C_CHALLENGE_KEY, MAX_PACKET_SIZE - packetind - 2);
+	packetind += strlen(M2C_CHALLENGE_KEY);
 
 	strncpy(&packet[packetind], challenge, MAX_PACKET_SIZE - packetind - 2);
 	packetind += strlen(challenge);
 	packet[packetind++] = '\\';
 
-	strncpy(&packet[packetind], MOTD_KEY, MAX_PACKET_SIZE - packetind - 2);
-	packetind += strlen(MOTD_KEY);
+	strncpy(&packet[packetind], M2C_MOTD_KEY, MAX_PACKET_SIZE - packetind - 2);
+	packetind += strlen(M2C_MOTD_KEY);
 
 	strncpy(&packet[packetind], motd, MAX_PACKET_SIZE - packetind - 2);
 	packetind += strlen(motd);
@@ -849,225 +881,211 @@ void HandleMessage(const char *msg, const struct sockaddr_in *address)
 {
 	server_t       *server;
 	int				newPort = 0;
-	int i;
 
-	// If it's an heartbeat
+// If it's kingpin	 "\\heartbeat\\31500\\gamename\\kingpin"
 	if(!strncmp(S2M_HEARTBEAT, msg, strlen(S2M_HEARTBEAT)))
 	{
-		//char            gameId[64];
 		char *value;
 		struct sockaddr_in *addPort;
-		/*
-		hypov8 port is -10 to use the listen port.
-		game port uses YYYY first.
-		 "\\heartbeat\\31500\\gamename\\kingpin"
-		 */
 
 		// Extract the game id
 		value = SearchInfostring(msg, "gamename");
-		if (value == NULL)
-			return;
-
-		if (!(strcmp(value, "kingpin") == 0))
-		{
-			MsgPrint(MSG_NORMAL, "%s ---> heartbeat (%s)\nNot Kingpin\n", peer_address, value);
-			return;
-		}
+		if (value == NULL)	{
+			MsgPrint(MSG_DEBUG, "%s Heartbeat ---> @%lld No GameName\n", peer_address, crt_time);
+			return;		}
+		if (!(strcmp(value, "kingpin") == 0)) {
+			MsgPrint(MSG_NORMAL, "%s ---> @%lld heartbeat (%s)\nNot Kingpin\n", peer_address, crt_time, value);
+			return;		}
 
 		value = SearchInfostring(msg, "heartbeat");
-		if (value == NULL)
-			return;
+		if (value == NULL) {
+			MsgPrint(MSG_DEBUG, "%s ---> @%lld No HeartBeat\n", peer_address, crt_time);
+			return;		}
 		newPort = atoi(value)+ 10;
 
-		//server->address.sin_port = htons((unsigned short)newPort);
-
-		/* hypov8
-		add port if specified in heartbeat*/
+		/* hypov8 add port if specified in heartbeat*/
 		addPort = (struct sockaddr_in*)address; //hypov8 compiler nag...
 		if (newPort)
 			addPort->sin_port = htons((unsigned short)newPort);
 
 		// Get the server in the list (add it to the list if necessary)
 		server = Sv_GetByAddr(addPort, qtrue);
-		if (server == NULL)
-		return;
-
+		if (server == NULL) {
+			MsgPrint(MSG_DEBUG, "%s ---> @%lld No server\n", peer_address, crt_time);
+			return;
+		}
 		server->active = qtrue;
+		server->timeout = crt_time + TIMEOUT_INFORESPONSE;
+		MsgPrint(MSG_DEBUG, "%s ---> @%lld \\\\Heartbeat\\\\\n", peer_address, crt_time);
 
-		/* set timeout value. */
-		//Sv_SetTimeout(address, TIMEOUT_HEARTBEAT);
-		server->timeout = crt_time + TIMEOUT_HEARTBEAT;
-		
-		SendGetInfo(server);
-
+		SendGetStatusKingpin(server); //status//
 	}
 
-	//Heartbeat
+//server yyyyHeartbeat. store. 
 	else if (!strncmp(S2M_HEARTBEAT_YYYY, msg, strlen(S2M_HEARTBEAT_YYYY)))
 	{
-		char *value;
-		//char *new_msg;
-
-		//new_msg = (char*)msg;
+		char *value, *msgTrimmed;
 
 		/*minus YYYYheartbeat\n*/
-		//strcpy(msg, &msg[14], sizeof(msg-14));
-		strcpy((char*)msg, &msg[strlen(S2M_HEARTBEAT_YYYY)]);
-
-		/* fix for info strings to long in kp1 */
-		for (i = 0; i < 5; i++) //loop 5 times. should be pleanty
-		{
-			if (!strncmp(S2M_ERROR_STR, msg, strlen(S2M_ERROR_STR)))
-			{
-				strcpy((char*)msg, &msg[strlen(S2M_ERROR_STR)]); 
-				continue;
-			}
-			break;
-		}
+		//strcpy(msgTrimmed, &msg[strlen(S2M_HEARTBEAT_YYYY)]);
+		msgTrimmed = (char*)msg + strlen(S2M_HEARTBEAT_YYYY);
+		msgTrimmed = fixStringToLongError(msgTrimmed);
 
 		// Extract the game id
-		value = SearchInfostring(msg, "protocol");
+		value = SearchInfostring((const char*)msgTrimmed, "protocol");
 		if (value == NULL)		{
-			MsgPrint(MSG_NORMAL, "No protocol in game string\n");
-			return;
-		}
+			MsgPrint(MSG_NORMAL, "%s ---> No protocol in game string\n", peer_address);
+			return;	}
 
 		// Get the server in the list (add it to the list if necessary)
 		server = Sv_GetByAddr(address, qtrue);
-		if (server == NULL)
-			return;
+		if (server == NULL) {
+			MsgPrint(MSG_DEBUG, "%s ---> @%lld 'YYYYHeartbeatNo' Server\n", peer_address, crt_time);
+			return;	}
 
-		server->protocol = atoi(value);
 		server->active = qtrue;
-
-		/* set timeout value. */
-		//Sv_SetTimeout(address, TIMEOUT_HEARTBEAT);
+		server->protocol = atoi(value);
 		server->timeout = crt_time + TIMEOUT_HEARTBEAT;
-		
-	}
+		MsgPrint(MSG_DEBUG, "%s ---> @%lld 'YYYYHeartbeat' \n", peer_address, crt_time);
 
-	else if (!strncmp(S2M_PRINT_YYYY, msg, strlen(S2M_PRINT_YYYY)))
+		//hypo does this need to check for strings then send get info?
+		//SendGetInfo(server); //not needed
+	}
+//server sent //gamename// save it
+	else if (!strncmp(S2M_GAMENAME_KINGPIN, msg, strlen(S2M_GAMENAME_KINGPIN)))
 	{
-		char *value;
+		char *sv_protocol, *msgTrimmed;
+		struct sockaddr_in tmpServerAddress;
+		u_short port;
+
+		//remove start of string 
+		//strcpy(msgTrimmed, &msg[strlen(S2M_GAMENAME_KINGPIN)]);
+		msgTrimmed = (char*)msg + strlen(S2M_GAMENAME_KINGPIN);
+
+		msgTrimmed = fixStringToLongError(msgTrimmed);
+
+		// Extract the game id
+		sv_protocol = SearchInfostring((const char*)msgTrimmed, "protocol");
+		if (sv_protocol == NULL) {
+			MsgPrint(MSG_NORMAL, "%s ---> No protocol in game string\n", peer_address);
+			return;
+		}
+
+		memcpy(&tmpServerAddress, address, sizeof(*address)); //hypov8 todo. is *address corect???
+
+		//kingpin Gamespy port \\status\\ reply. add game port instead
+		if (!strncmp(sv_protocol,"32", strlen(sv_protocol)))
+		{
+			port = ntohs(tmpServerAddress.sin_port);
+			port += 10;
+			tmpServerAddress.sin_port = htons(port);
+		}
+
+		// Get the server in the list (add it to the list if necessary)
+		server = Sv_GetByAddr(&tmpServerAddress, qtrue);
+		if (server == NULL) {
+			MsgPrint(MSG_DEBUG, "%s ---> @%lld '\\\\gamename\\\\kingpin' No Server\n", peer_address, crt_time);
+			return;
+		}
+		server->active = qtrue;
+		server->protocol = atoi(sv_protocol);
+		MsgPrint(MSG_DEBUG, "%s ---> @%lld '\\\\gamename\\\\kingpin\\' \n", peer_address, crt_time);
+		server->timeout = crt_time + TIMEOUT_HEARTBEAT;
+	}
+//server sent yyyyprint	save it
+	else if ((!strncmp(S2M_PRINT_YYYY, msg, strlen(S2M_PRINT_YYYY))))
+	{
+		char *value, *msgTrimmed;
 
 		/*minus YYYYheartbeat\n*/
-		//strcpy(msg, &msg[14]);
-		strcpy((char*)msg, &msg[strlen(S2M_PRINT_YYYY)]);
+		//strcpy(msgTrimmed, &msg[strlen(S2M_PRINT_YYYY)]);
+		msgTrimmed = (char*)msg + strlen(S2M_PRINT_YYYY);
+		msgTrimmed = fixStringToLongError(msgTrimmed);
 
-		/* fix for info strings to long in kp1 */
-		for (i = 0; i < 5; i++) //loop 5 times. should be pleanty
-		{
-			if (!strncmp(S2M_ERROR_STR, msg, strlen(S2M_ERROR_STR)))
-			{
-				strcpy((char*)msg, &msg[strlen(S2M_ERROR_STR)]);
-				continue;
-			}
-			break;
-		}
 		// Extract the game id
-		value = SearchInfostring(msg, "protocol");
+		value = SearchInfostring(msgTrimmed, "protocol");
 		if (value == NULL)		{
-			MsgPrint(MSG_NORMAL, "No protocol in game string\n");
-			return;
-		}
+			MsgPrint(MSG_NORMAL, "%s ---> No protocol in game string\n", peer_address);
+			return;	}
 
 		if (!(strcmp(value, "32") == 0))		{
-			MsgPrint(MSG_NORMAL, "Game is not protocol 32\n");
-			return;
-		}
+			MsgPrint(MSG_NORMAL, "%s ---> Game is not protocol 32\n", peer_address);
+			return;	}
 
 		// Get the server in the list (add it to the list if necessary)
 		server = Sv_GetByAddr(address, qtrue);
-		if (server == NULL)
-			return;
+		if (server == NULL) {
+			MsgPrint(MSG_DEBUG, "%s ---> @%lld 'YYYYPrint' No Server\n", peer_address, crt_time);
+			return;		}
 
-		server->protocol = atoi(value);
 		server->active = qtrue;
-
-		/* set timeout value. */
-		//Sv_SetTimeout(address, TIMEOUT_HEARTBEAT);
+		server->protocol = atoi(value);
 		server->timeout = crt_time + TIMEOUT_HEARTBEAT;
-
+		MsgPrint(MSG_DEBUG, "%s ---> @%lld 'yyyyprint' \n", peer_address, crt_time);
 	}
-
-
-	/* server sent shutdown, check if status changed or quit */
+//server sent shutdown, check if status changed or quit
 	else if (!strncmp(S2M_SHUTDOWN_YYYY, msg, strlen(S2M_SHUTDOWN_YYYY)))
 	{
 		/* check for a valid server */
 		server = Sv_GetByAddr(address, qfalse);
 		if (server == NULL)
-		{
-			//server = Sv_GetByAddr(address, qtrue);
-			//if (server == NULL)
-			//	return;
-
-			//SendGetInfo(server); //hypov8 server didnt send initial heartbeat, but try add anyway
+		{	//hypov8 server didnt send initial heartbeat. add it
+			server = Sv_GetByAddr(address, qtrue);
+			if (server == NULL) {
+				MsgPrint(MSG_DEBUG, "%s ---> @%lld 'YYYYShutDown' No Server\n", peer_address, crt_time);
+				return;
+			}
+			server->timeout = crt_time + TIMEOUT_INFORESPONSE;
+			MsgPrint(MSG_DEBUG, "%s --->  @%lld YYYYShutdown\n", peer_address, crt_time);
+			SendGetInfo(server);
 			return;
 		}
 
-		/* set timeout value. */
-		//Sv_SetTimeout(address, TIMEOUT_PING);
 		server->timeout = crt_time + TIMEOUT_PING;
+		MsgPrint(MSG_DEBUG, "%s ---> @%lld YYYYShutdown\n", peer_address, crt_time);
 
 		/* check if server is active or shutdown */
 		SendPing(server);
 	}
-
-	/* server sent ack, check if status changed or quit */
+//server sent ack. keep active. do we need to check if status changed?
 	else if (!strncmp(S2M_ACK_YYYY, msg, strlen(S2M_ACK_YYYY)))
 	{
 		server = Sv_GetByAddr(address, qfalse);
-		if (server == NULL)
-			return;
+		if (server == NULL) {
+			MsgPrint(MSG_DEBUG, "YYYYack ---> @%lld No Server\n", crt_time);
+			return;		}
 
-		/* update timeout */
-		//Sv_SetTimeout(address, TIMEOUT_HEARTBEAT);
 		server->timeout = crt_time + TIMEOUT_HEARTBEAT;
-
 	}
-
-	// server sent ping
+//server sent ping
 	else if (!strncmp(S2M_PING_YYYY, msg, strlen(S2M_PING_YYYY)))
 	{
 		/* check for a valid server */
 		server = Sv_GetByAddr(address, qtrue);
-		if (server == NULL)
-			return;
+		if (server == NULL) {
+			MsgPrint(MSG_DEBUG, "YYYYping ---> @%lld No Server\n", crt_time);
+			return;		}
 
-		/* set timeout value. */
-		//Sv_SetTimeout(address, TIMEOUT_HEARTBEAT);
 		server->timeout = crt_time + TIMEOUT_HEARTBEAT;
-		
+		MsgPrint(MSG_DEBUG, "%s ---> @%lld YYYYping\n", peer_address, crt_time);
 		SendAck(server);
 	}
-
-	// If it's an infoResponse message
-	else if(!strncmp(S2M_INFORESPONSE, msg, strlen(S2M_INFORESPONSE)))
-	{
-		server = Sv_GetByAddr(address, qfalse);
-		if(server == NULL)
-			return;
-
-		HandleInfoResponse(server, msg + strlen(S2M_INFORESPONSE));
-	}
-
-	// If it's a getservers request
-	else if(!strncmp(C2M_GETSERVERS, msg, strlen(C2M_GETSERVERS)))
-	{
-		HandleGetServers(msg + strlen(C2M_GETSERVERS), address, qfalse, 0);
-	}
-
-	// If it's a getmotd request
+//client to master. getservers request
+	//else if(!strncmp(C2M_GETSERVERS, msg, strlen(C2M_GETSERVERS)))
+	//{
+	//	MsgPrint(MSG_DEBUG, "%s ---> @%lld get servers kp1\n", peer_address, crt_time);
+	//	HandleGetServers(address, qfalse, 0);
+	//}
+//client to master. getmotd request. ToDo: motd
 	else if(!strncmp(C2M_GETMOTD, msg, strlen(C2M_GETMOTD)))
 	{
+		MsgPrint(MSG_DEBUG, "%s ---> @%lld getmoto kp1\n", peer_address, crt_time);
 		HandleGetMotd(msg + strlen(C2M_GETMOTD), address);
 	}
-
+//error
 	else
 	{
-		MsgPrint(MSG_NORMAL, "%s ---> invalid (%s)\n", peer_address, msg);
-
+		MsgPrint(MSG_NORMAL, "%s ---> invalid packet (%s)\n", peer_address, msg);
 	}
 
 
@@ -1085,7 +1103,7 @@ void HandleMessageKPQ3(const char *msg, const struct sockaddr_in *address)
 {
 	server_t       *server;
 
-	// If it's an heartbeat
+// If it's an heartbeat
 	if (!strncmp(S2M_HEARTBEAT_DP, msg, strlen(S2M_HEARTBEAT_DP)))
 	{
 		char            gameId[64];
@@ -1105,13 +1123,13 @@ void HandleMessageKPQ3(const char *msg, const struct sockaddr_in *address)
 		// we let it some more time to contact us. After that, only
 		// infoResponse messages can update the timeout value.
 		if (!server->maxclients)
-			server->timeout = crt_time + TIMEOUT_HEARTBEAT;
+			server->timeout = crt_time + TIMEOUT_INFORESPONSE;
 
 		// Ask for some infos
 		SendGetInfoKPQ3(server);
 	}
 
-	// If it's an heartbeat
+// If it's an heartbeat
 	else if (!strncmp(S2M_HEARTBEAT_KPQ3, msg, strlen(S2M_HEARTBEAT_KPQ3)))
 	{
 		char            gameId[64];
@@ -1131,13 +1149,13 @@ void HandleMessageKPQ3(const char *msg, const struct sockaddr_in *address)
 		// we let it some more time to contact us. After that, only
 		// infoResponse messages can update the timeout value.
 		if (!server->maxclients)
-			server->timeout = crt_time + TIMEOUT_HEARTBEAT;
+			server->timeout = crt_time + TIMEOUT_INFORESPONSE;
 
 		// Ask for some infos
 		SendGetInfoKPQ3(server);
 	}
 
-	// If it's an infoResponse message
+// If it's an infoResponse message
 	else if (!strncmp(S2M_INFORESPONSE_KPQ3, msg, strlen(S2M_INFORESPONSE_KPQ3)))
 	{
 		server = Sv_GetByAddr(address, qfalse);
@@ -1147,29 +1165,40 @@ void HandleMessageKPQ3(const char *msg, const struct sockaddr_in *address)
 		HandleInfoResponseKPQ3(server, msg + strlen(S2M_INFORESPONSE_KPQ3));
 	}
 
-	// If it's a getservers request
+// If it's a getservers request
 	else if (!strncmp(C2M_GETSERVERS_KPQ3, msg, strlen(C2M_GETSERVERS_KPQ3)))
 	{
 		HandleGetServersKPQ3(msg + strlen(C2M_GETSERVERS_KPQ3), address);
 	}
 
-	// If it's a getservers request 
+// If it's a getservers request 
 	else if (!strncmp(C2M_GETSERVERS2_KPQ3, msg, strlen(C2M_GETSERVERS2_KPQ3)))
 	{
 		MsgPrint(MSG_DEBUG, "%s ---> getservers (%s)\n", peer_address, msg);
 		HandleGetServersKPQ3(msg + strlen(C2M_GETSERVERS2_KPQ3), address);
 	}
 
-
-	// If it's a getmotd request
+// If it's a getmotd request
 	else if (!strncmp(C2M_GETMOTD_KPQ3, msg, strlen(C2M_GETMOTD_KPQ3)))
 	{
 		HandleGetMotd(msg + strlen(C2M_GETMOTD_KPQ3), address);
 	}
-	else
+
+// If it's a shutdown request
+	else if (!strncmp(S2M_FLATLINE_KPQ3, msg, strlen(S2M_FLATLINE_KPQ3)))
 	{
-		MsgPrint(MSG_NORMAL, "%s ---> invalid kpq3 (%s)\n", peer_address, msg);
+		if (strstr(msg, "Flatline") != 0)
+		{
+			server = Sv_GetByAddr(address, qfalse);
+			if (server == NULL)
+				return;
+			server->timeout = crt_time /*+ TIMEOUT_CHALLENGE*/; //remove server
+		}
 	}
+// invalid
+	else
+		MsgPrint(MSG_NORMAL, "%s ---> invalid kpq3 (%s)\n", peer_address, msg);
+
 }
 
 
@@ -1180,77 +1209,88 @@ HandleMessage
 Parse a packet to figure out what to do with it
 ====================
 */
-int HandleGspyMessage(const char *msg, const struct sockaddr_in *address)
+void HandleGspyMessage(const char *msg, const struct sockaddr_in *address)
 {
 	char *value;
+	const char *challenge = 0;
+	char *tmp;
 
-	// If it's gamespylite request
-	if (!strncmp(B2M_INITCONTACT, msg, strlen(B2M_INITCONTACT)))
+// If it's gamespylite inital request
+	if (!strncmp(B2M_INITALCONTACT, msg, strlen(B2M_INITALCONTACT)))
 	{
-		HandleGetServers(msg + strlen(C2M_GETSERVERS), address, qtrue,0);
-		return 1;
+		HandleGetServers(address, qtrue,0);
+		MsgPrint(MSG_DEBUG, "Sent GamespyLite Packet\n");
+		//return 1;
 	}
 
-	// old gamespy responce to request
-	else if (!strncmp(B2M_GETSERVERS, msg, strlen(B2M_GETSERVERS))) //hypov8 not used anymore
-	{
+// old gamespy responce to request. //list//
+	else if (!strncmp(B2M_GETSERVERS, msg, strlen(B2M_GETSERVERS))) 
+	{ // \list\\gamename\kingpinver\01\location\0\validate\LO/WUC4c\final\\queryid\1.1
 
 		// Extract the game id
-		value = SearchInfostring(msg, "gamename");
-		if (value == NULL)
-			return 0;
-
-		if (!(strcmp(value, "kingpin") == 0) && !(strcmp(value, "kingpinver") == 0)) //kingpinver??
+		tmp = strstr(msg, "\\gamename");
+		//str
+		value = SearchInfostring((const char*)tmp, "gamename");
+		if (value != NULL)
 		{
-			MsgPrint(MSG_NORMAL, "%s ---> heartbeat (%s)\nNot Kingpin\n", peer_address, value);
-			return 0;
+			MsgPrint(MSG_DEBUG, "%s ---> B2M \\list\\ (%s)\n", peer_address, value);
+			challenge = value;
 		}
-		else
-			HandleGetServers(msg + strlen(C2M_GETSERVERS), address, qtrue, 0);
 
-		return 2;
+		HandleGetServers(address, qtrue, challenge);
+		MsgPrint(MSG_DEBUG, "Sent GamespyLite Packet\n");
+		//return 1;
 	}
-	//gslist server requests. not working correct???
+//gslist server requests.
 	else if(!strncmp(B2M_GETSERVERS_GSLIST2, msg, strlen(B2M_GETSERVERS_GSLIST2)))
-	{
-		const char *challenge = 0;
-		char  packet[MAX_PACKET_SIZE + 1];
-		char *tmp;
-		//\gamename\gamespy2\gamever\20603020\enctype\0\validate\UpkV3Mfn\final\\list\cmp\gamename\kps)
+	{	//\gamename\gamespy2\gamever\20603020\enctype\0\validate\UpkV3Mfn\final\\list\cmp\gamename\kps)
 		//\gamename\gamespy2\gamever\20603020\enctype\0\validate\UpkV3Mfn\final\\list\cmp\gamename\kingpin
 		//kingpin            QFWxY2
 		//quake2             rtW0xg
 
-
+		//const char *challenge = 0;
+		char  packet[MAX_PACKET_SIZE + 1];
 		int tcp = 1;
+		//char *tmp;
 
 		memset(packet, 0, sizeof(packet)); //reset packet, prevent any issues
+
 		/*// Extract encrypt type    \\enctype\\0\*/
 		value = SearchInfostring(msg, "enctype");
 		if (value != NULL)
-		{
 			if (value[0] == '0')	
 				tcp = 2;
-		}
-		//value = SearchInfostring(msg, "validate");
-		//if (value != NULL)
-		//	challenge = (unsigned char*)value;
 
 		tmp = strstr(msg, "\\list\\cmp");
-		value = SearchInfostring(tmp, "gamename");
+		value = SearchInfostring((const char*)tmp, "gamename");
 		if (value != NULL)
 			challenge = value;
 
-		//nb_bytes = 
-			//recv(tmpClientOut_tcp, packet, MAX_PACKET_SIZE, 0);
-
-
-
-		HandleGetServers(msg + strlen(C2M_GETSERVERS), address, tcp, challenge);
-		return 3;
+		HandleGetServers(address, tcp, challenge);
+		MsgPrint(MSG_DEBUG, "Sent GSLite Packet\n");
+		//return 3;
 	}
-
-	MsgPrint(MSG_NORMAL, "%s ---> invalid GameSpy (%s)\n", peer_address, msg);
-	return 0;
+	else //error
+	{
+		MsgPrint(MSG_NORMAL, "%s ---> invalid GameSpy (%s)\n", peer_address, msg);
+		printf("ERROR: NOT GamespyLite Packet\n");
+		//return 0;
+	}
 }
 
+
+qboolean IsGameSpyPacket(const char *msg)
+{
+	char *value;
+	value = strstr(msg, "\\list\\");
+	if (value)
+		return 0;
+
+	// If it's gamespylite request
+	if (!strncmp(B2M_INITALCONTACT, msg, strlen(B2M_INITALCONTACT)) ||
+		!strncmp(B2M_GETSERVERS_GSLIST2, msg, strlen(B2M_GETSERVERS_GSLIST2)))
+		return qtrue;
+
+	return qfalse;
+
+}

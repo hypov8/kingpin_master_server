@@ -1,5 +1,16 @@
-command line options
+=============
+ip_rename.txt
+=============
+1 line per server eg..
+-----
+192.168.1.121=110.175.51.202
+192.168.1.123=kp.servegame.com
+-----
 
+
+====================
+command line options
+====================
 -h help
 
 -H Hash size
@@ -14,8 +25,18 @@ command line options
 
 -n Maximum number of servers
 
--p Port number (kp1)
+-p Port number for Kingpin (default 27900)
 
--q Port number (kpq3)
+-q Port number KingpinQ3 (default 27950)
 
--v Verbose level, up to 4 (default: 4; no value means max)"
+-v Verbose level, up to 4 (default: 3; no value after V means 4)"
+
+-s Static ip address. Only use if master ip is not dynamic. 
+	will not recheck ip conversion for dns in ip_rename.txt
+
+
+====================
+kingpin servers
+====================
+when running master on same pc as the servers, you need to setmaster to the lan ip address.
+wan ip will return the ip of the router and make ip conversion invalid.

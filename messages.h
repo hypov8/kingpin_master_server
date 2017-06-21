@@ -33,9 +33,9 @@
 void	HandleMessage(const char *msg, const struct sockaddr_in *address);
 
 ///hypov8 gamespy specific requests
-int		HandleGspyMessage(const char *msg, const struct sockaddr_in *address);
-
-void	HandleMessageKPQ3(const char *msg, const struct sockaddr_in *address);
+void		HandleGspyMessage(const char *msg, const struct sockaddr_in *address);
+void		HandleMessageKPQ3(const char *msg, const struct sockaddr_in *address);
+qboolean	IsGameSpyPacket(const char *msg);
 
 //unsigned char *gsseckey(unsigned char *dst, unsigned char *src, unsigned char *key, int enctype);
 

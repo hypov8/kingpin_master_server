@@ -90,11 +90,11 @@ static const char *low_priv_user = DEFAULT_LOW_PRIV_USER;
 
 // The master socket
 
-SOCKET		inSock			 = INVALID_SOCKET;
-SOCKET		inSock_kpq3		 = INVALID_SOCKET; //listen on kpq3 port
-SOCKET		outSock			 = INVALID_SOCKET;
+SOCKET		inSock			 = INVALID_SOCKET; // listen kp port
+SOCKET		inSock_kpq3		 = INVALID_SOCKET; //listen kpq3 port
+SOCKET		outSock			 = INVALID_SOCKET; // out kp
 SOCKET		outSock_kpq3	 = INVALID_SOCKET; // out kpq3
-SOCKET		inSock_tcp		 = INVALID_SOCKET;
+SOCKET		inSock_tcp		 = INVALID_SOCKET; // in tcp
 SOCKET		tmpClientOut_tcp = INVALID_SOCKET; //used for gamespylite tempory client connection
 
 
@@ -102,6 +102,10 @@ SOCKET		tmpClientOut_tcp = INVALID_SOCKET; //used for gamespylite tempory client
 
 // The current time (updated every time we receive a packet)
 time_t          crt_time;
+time_t			last_dns_time =0; //add hypo refresh dns
+
+//static ip switch
+qboolean isStaticIPHost = qfalse;
 
 // Maximum level for a message to be printed
 msg_level_t     max_msg_level = MSG_NORMAL;
@@ -154,7 +158,6 @@ static void PrintPacket(const char *packet, size_t length)
 SocketError_close
 
 close socket, depending on compiler
-hypov8 made just to clean up code a bit
 ====================
 */
 static void SocketError_close(SOCKET old_socket)
@@ -474,6 +477,11 @@ static qboolean ParseCommandLine(int argc, const char *argv[])
 						vlevel = MSG_DEBUG;
 					break;
 
+					//static ip
+				case 's':
+					isStaticIPHost = qtrue;
+					break;
+
 				default:
 					valid_options = qfalse;
 			}
@@ -519,21 +527,22 @@ static void PrintHelp(void)
 			 "  -m <a1>=<a2>     : map address <a1> to <a2> when sending it to clients\n"
 			 "                     addresses can contain a port number (ex: myaddr.net:1234)\n"
 			 "  -n <max_servers> : maximum number of servers recorded (default: %u)\n"
-			 "  -p <port_num>    : use port <port_num> (default: %u)\n"
+			 "  -p <port_num>    : Kingpin:   use port <port_num> (default: %u)\n"
+			 "  -q <port_num>    : KingpinQ3: use port <port_num> (default: %u)\n"
 #ifndef WIN32
 			 "  -u <user>        : use <user> privileges (default: %s)\n"
 			 "                     only available when running with super-user privileges\n"
 #endif
-			 "  -v [verbose_lvl] : verbose level, up to %u (default: %u; no value means max)\n"
+		"  -v [verbose_lvl] : verbose level, up to %u (default: %u) (no value = %u)\n"
 			 "\n", MAX_HASH_SIZE, DEFAULT_HASH_SIZE,
 #ifndef WIN32
 			 DEFAULT_JAIL_PATH,
 #endif
-			 DEFAULT_MAX_NB_SERVERS, DEFAULT_MASTER_PORT,
+			 DEFAULT_MAX_NB_SERVERS, DEFAULT_MASTER_PORT, DEFAULT_MASTER_PORT_KPQ3,
 #ifndef WIN32
 			 DEFAULT_LOW_PRIV_USER,
 #endif
-			 MSG_DEBUG, MSG_NORMAL);
+			 MSG_DEBUG, MSG_NORMAL, MSG_DEBUG);
 }
 
 
@@ -708,7 +717,9 @@ static void cleanUp(int signal)
 }
 
 #define ADDRESS_LENGTH 16
-static const char *ignoreFile = "ignore.txt";
+#define ADDRESS_LENGTHIPADD 33 //16+16+1 //hypov8 ip+ip+=
+static const char *ipIgnoreFile = "ip_ignore.txt";
+static const char *ipConvertFile = "ip_rename.txt"; //hypov8 ip rename
 
 typedef struct
 {
@@ -719,18 +730,21 @@ typedef struct
 
 static time_t   lastParseTime = 0;
 static int      numIgnoreAddresses = 0;
+static int      numIPRename = 0; //hypov8 ip rename
 static ignoreAddress_t *ignoreAddresses = NULL;
+static ignoreAddress_t *ipAddresses = NULL; //hypov8 ip rename
 
 /*
 ====================
 parseIgnoreAddress
 ====================
 */
-static qboolean parseIgnoreAddress(void)
+static qboolean parseIgnoreAddress(void) //hypov8 will allways load file when a new ip request
 {
 	int             numAllocIgnoreAddresses = 1;
 	FILE           *f = NULL;
 	int             i;
+	boolean			skipLine;
 
 	// Only reparse periodically
 	if(crt_time - lastParseTime < PARSE_INTERVAL)
@@ -752,7 +766,7 @@ static qboolean parseIgnoreAddress(void)
 	if(ignoreAddresses == NULL)
 		return qfalse;
 
-	f = fopen(ignoreFile, "r");
+	f = fopen(ipIgnoreFile, "r");
 
 	if(!f)
 	{
@@ -775,11 +789,13 @@ static qboolean parseIgnoreAddress(void)
 		}
 		while(c != EOF && isspace(c));
 
-		if(c != EOF)
+		if (c != EOF)
 		{
+			memset(buffer, 0, sizeof(buffer)); //hypov8 reset buffer length to zero
+			skipLine = FALSE; //add hypo allow comments
 			do
 			{
-				if(i >= ADDRESS_LENGTH)
+				if (i >= ADDRESS_LENGTH)
 				{
 					buffer[i - 1] = '\0';
 					break;
@@ -787,37 +803,48 @@ static qboolean parseIgnoreAddress(void)
 
 				buffer[i] = c;
 
-				if(isspace(c))
+				if (isspace(c))
 				{
 					buffer[i] = '\0';
 					break;
 				}
 
-				i++;
-			} while((c = (char)fgetc(f)) != EOF);
-
-			strcpy(ignoreAddresses[numIgnoreAddresses].address, buffer);
-
-			numIgnoreAddresses++;
-
-			// Make list bigger
-			if(numIgnoreAddresses >= numAllocIgnoreAddresses)
-			{
-				ignoreAddress_t *new;
-
-				numAllocIgnoreAddresses *= 2;
-				new = realloc(ignoreAddresses, sizeof(ignoreAddress_t) * numAllocIgnoreAddresses);
-
-				// Alloc failed, fail parsing
-				if(new == NULL)
+				if (i == 0 && (buffer[0] == '/'))
 				{
-					fclose(f);
-					free(ignoreAddresses);
-					ignoreAddresses = NULL;
-					return qfalse;
+					char tmpBuff[256];
+					buffer[i] = '\0';
+					fgets(tmpBuff, 256, f); //goto next line in file
+					skipLine = TRUE; //comment line
+					break;
 				}
 
-				ignoreAddresses = new;
+				i++;
+			} while ((c = (char)fgetc(f)) != EOF);
+			if (!skipLine)
+			{
+				strcpy(ignoreAddresses[numIgnoreAddresses].address, buffer);
+
+				numIgnoreAddresses++;
+
+				// Make list bigger
+				if (numIgnoreAddresses >= numAllocIgnoreAddresses)
+				{
+					ignoreAddress_t *new;
+
+					numAllocIgnoreAddresses *= 2;
+					new = realloc(ignoreAddresses, sizeof(ignoreAddress_t) * numAllocIgnoreAddresses);
+
+					// Alloc failed, fail parsing
+					if (new == NULL)
+					{
+						fclose(f);
+						free(ignoreAddresses);
+						ignoreAddresses = NULL;
+						return qfalse;
+					}
+
+					ignoreAddresses = new;
+				}
 			}
 		}
 	}
@@ -857,6 +884,123 @@ static qboolean ignoreAddress(const char *address)
 	return qfalse;
 }
 
+
+
+/*
+====================
+parseIPConversion
+====================
+*/
+static void parseIPConversion(void) //hypov8 file loaded at start?
+{
+//	int             numAllocIPAddresses = 1;
+	FILE           *f = NULL;
+	int             i;
+	boolean			skipLine;
+
+	//last_dns_time = crt_time;
+
+#if 0
+	numIPRename = 0;
+	ipAddresses = malloc(sizeof(ignoreAddress_t) * numAllocIPAddresses);
+
+	// Alloc failed, fail parsing
+	if (ipAddresses == NULL)
+		return qfalse;
+#endif
+
+	f = fopen(ipConvertFile, "r");
+
+	if (!f)
+	{
+		free(ipAddresses);
+		ipAddresses = NULL;
+		return /*qfalse*/;
+	}
+
+	while (!feof(f))
+	{
+		char            c;
+		char            buffer[ADDRESS_LENGTHIPADD]; // [ADDRESS_LENGTH];
+
+		i = 0;
+
+		// Skip whitespace
+		do
+		{
+			c = (char)fgetc(f);
+		} while (c != EOF && isspace(c));
+
+		if (c != EOF)
+		{
+			memset(buffer, 0, sizeof(buffer)); //hypov8 reset buffer length to zero
+			skipLine = FALSE; //add hypo allow comments
+			do
+			{
+				if (i >= ADDRESS_LENGTHIPADD)
+				{
+					buffer[i - 1] = '\0';
+					break;
+				}
+
+				buffer[i] = c;
+
+				if (isspace(c))
+				{
+					buffer[i] = '\0';
+					break;
+				}
+
+				if (i == 0 && (buffer[0] == '/'))
+				{
+					char tmpBuff[256];
+					buffer[i] = '\0';
+					fgets(tmpBuff, 256, f); //goto next line in file
+					skipLine = TRUE; //comment line
+					break;
+				}
+
+				i++;
+			} while ((c = (char)fgetc(f)) != EOF);
+
+			//buffer[i] = '\0';
+			if (!skipLine)
+				Sv_AddAddressMapping(buffer); //hypov8 add ip
+#if 0
+			strcpy(ipAddresses[numIPRename].address, buffer);
+
+			numIPRename++;
+
+			// Make list bigger
+			if (numIPRename >= numAllocIPAddresses)
+			{
+				ignoreAddress_t *new;
+
+				numAllocIPAddresses *= 2;
+				new = realloc(ipAddresses, sizeof(ignoreAddress_t) * numAllocIPAddresses);
+
+				// Alloc failed, fail parsing
+				if (new == NULL)
+				{
+					fclose(f);
+					free(ipAddresses);
+					ipAddresses = NULL;
+					return qfalse;
+				}
+
+				ipAddresses = new;
+			}
+#endif
+		}
+	}
+
+	fclose(f);
+
+	return /*qtrue*/;
+}
+
+
+
 /*
 ====================
 replaceNullChar
@@ -864,27 +1008,38 @@ replaceNullChar
 replace null with \
 ====================
 */
-char* replaceNullChar(const char *packet)
+void replaceNullChar(char packet[1024], int packet_len)
 {
 	int i;
-	char s = 0;
-	char *new_packet;
-	int packet_len = strlen(packet);
+	char s;
+//	char *out_packet;
+	//int packet_len = strlen(packet);
 
-	new_packet = (char*)packet;
+	//new_packet = (char*)packet;
 
 	for (i = 0; i <= packet_len; i++)
 	{
-		s = new_packet[i];
+		s = packet[i];
 		if (s == '\0')
-			s = '\'';
+			s = '\\';
 
 		if (i == packet_len)
 			s = '\0';
 
-		new_packet[i] = s;
+		packet[i] = s;
 	}
-	return new_packet;
+	//return out_packet;
+
+}
+
+//compatability??
+void Sys_Sleep(void)
+{
+#ifdef _WIN32
+	Sleep(100);
+#else
+	usleep(100000);
+#endif
 
 }
 
@@ -908,12 +1063,17 @@ int main(int argc, const char *argv[])
 	//hypo
 	qboolean isTCP, isKPQ3;
 	int iSendResult;
+	//time_t       last_dns_time;
 
 	signal(SIGINT, cleanUp);
 	signal(SIGTERM, cleanUp);
 
 	// Get the options from the command line
 	valid_options = ParseCommandLine(argc, argv);
+
+	//hypov8 alocate ip name conversion
+	parseIPConversion();
+
 
 	MsgPrint(MSG_NORMAL, "Kingpin master (version " VERSION " " __DATE__ " " __TIME__ ")\n");
 
@@ -940,67 +1100,48 @@ int main(int argc, const char *argv[])
 		FD_SET(outSock_kpq3, &rfds);
 		tv.tv_sec = tv.tv_usec = 0;
 
-#if 1
 		// Check for new data every 100ms
 		//if(select(max(inSock, outSock) + 1, &rfds, NULL, NULL, &tv) <= 0)
 		if (select(0, &rfds, NULL, NULL, &tv) <= 0)
 		{
-#ifdef _WIN32
-			Sleep(100);
-#else
-			usleep(100000);
-#endif
+			Sys_Sleep();
 			continue;
 		}
-#else
-
-
-		activity = select(0, &rfds, NULL, NULL, NULL);
-
-		if (activity == SOCKET_ERROR)
-		{
-			printf("select call failed with error code : %d", WSAGetLastError());
-			exit(EXIT_FAILURE);
-		}
-
-#endif
-
 
 		isTCP = 0;
 		isKPQ3 = 0;
 		memset(packet, 0, sizeof(packet)); //reset packet, prevent any issues
 
-		if (FD_ISSET(inSock, &rfds))
-		{
+		if (FD_ISSET(inSock, &rfds))	{
 			sock = inSock;
 		}
-		else if (FD_ISSET(inSock_kpq3, &rfds))
-		{
+		else if (FD_ISSET(inSock_kpq3, &rfds))	{
 			isKPQ3 = 1;
 			sock = inSock_kpq3;
 		}
-		else if (FD_ISSET(inSock_tcp, &rfds))		
-		{
+		else if (FD_ISSET(inSock_tcp, &rfds))	{
 			isTCP = 1;
 			sock = inSock_tcp;
 		}
-		else if (FD_ISSET(outSock, &rfds))
-		{
+		else if (FD_ISSET(outSock, &rfds))	{
 			sock = outSock;
 		}
-		else if (FD_ISSET(outSock_kpq3, &rfds))
-		{
+		else if (FD_ISSET(outSock_kpq3, &rfds))	{
 			isKPQ3 = 1;
 			sock = outSock_kpq3;
 		}
 		else
-		{
 			continue;
-		}
-
+	
 	
 		addrlen = sizeof(address);
 		crt_time = time(NULL);
+
+		// hypo try resolve dns names every 5 min(dynamic ip's)
+		if (!isStaticIPHost && last_dns_time < crt_time)	{
+			last_dns_time = crt_time + (5*60*1000); //5 min
+			Sv_ResolveAddressMappings();
+		}
 
 // Get the next valid message
 		if (isTCP)
@@ -1008,154 +1149,126 @@ int main(int argc, const char *argv[])
 			char *echo = "\\basic\\\\secure\\TXKOAT"; //21
 
 			tmpClientOut_tcp = accept(sock, (struct sockaddr *)&address, (socklen_t*)&addrlen);
-			if (tmpClientOut_tcp == INVALID_SOCKET)
-			{
+			if (tmpClientOut_tcp == INVALID_SOCKET)		{
 				printf("accept failed with error: %d\n", WSAGetLastError());
 				SocketError_close(tmpClientOut_tcp);
+				continue;
 			}
 
-#ifndef NEWTCP
 			// Ignore abusers
-			if (ignoreAddress(inet_ntoa(address.sin_addr)))
-			{
+			if (ignoreAddress(inet_ntoa(address.sin_addr)))		{
 				printf("Ignore abusers: \n");
-				closesocket(tmpClientOut_tcp);
+				SocketError_close(tmpClientOut_tcp);
 				continue;
 			}
 
-			if (FloodIpStoreReject(&address))
-			{
+			if (FloodIpStoreReject(&address))	{
 				printf("%s:%hu ---> FLOOD: Client Rejected\n", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
-				closesocket(tmpClientOut_tcp);
+				SocketError_close(tmpClientOut_tcp);
 				continue;
 			}
-#endif
+
 			//send empty packet then echo
 			iSendResult = send(tmpClientOut_tcp, 0, 0, 0);
 			iSendResult = send(tmpClientOut_tcp, echo, strlen(echo), 0);
-			if (iSendResult == SOCKET_ERROR) 
-			{
+			if (iSendResult == SOCKET_ERROR) 	{
 				printf("send failed with error: %d\n", WSAGetLastError());
 				SocketError_close(tmpClientOut_tcp);
 				continue; // return 1;
 			}
 
 			nb_bytes = recv(tmpClientOut_tcp, packet, MAX_PACKET_SIZE, 0);
-			if (nb_bytes == SOCKET_ERROR)
-			{
+			if (nb_bytes == SOCKET_ERROR)	{
 				printf("send failed with error: %d\n", WSAGetLastError());
 				SocketError_close(tmpClientOut_tcp);
-				continue; // return 1;
+				continue;
 			}
-			iSendResult = send(tmpClientOut_tcp, 0, 0, 0);
-		}
-		else //end tcp
-			nb_bytes = recvfrom(sock, packet, sizeof(packet) - 1, 0, (struct sockaddr *)&address, &addrlen);
 
-		if(nb_bytes <= 0)
+			iSendResult = send(tmpClientOut_tcp, 0, 0, 0);
+			/* check if we have recieved usable data */
+			if (IsGameSpyPacket(packet)) //if //gamename//gspylite// and NOT //list//
+				nb_bytes = recv(tmpClientOut_tcp, packet, MAX_PACKET_SIZE, 0);
+
+		}
+		else //end TCP
+			nb_bytes = recvfrom(sock, packet, sizeof(packet) - 1, 0, (struct sockaddr *)&address, &addrlen);	//use UDP
+
+		if(nb_bytes <= 0) //hypov8 note, error from sending ping after a shutdown. remove??
 		{
-			MsgPrint(MSG_WARNING, "WARNING: %s:%hu ---> returned %d bytes\n", inet_ntoa(address.sin_addr), ntohs(address.sin_port), nb_bytes);
-			//MsgPrint(MSG_WARNING, "WARNING: \"recvfrom\" returned %d\n", nb_bytes);
+			server_t       *server;
+
+			MsgPrint(MSG_DEBUG, "%s:%hu ---> @%lld returned %d bytes ( shutdown )\n",
+				inet_ntoa(address.sin_addr), ntohs(address.sin_port), crt_time, nb_bytes);
+
+			server = Sv_GetByAddr(&address, qfalse);
+			if (server == NULL)
+				continue;
+			server->timeout = crt_time /*+ (5*1000)*/; //remove server??
+
 			continue;
 		}
-#ifndef NEWTCP
 
-				// Ignore abusers
-			if (ignoreAddress(inet_ntoa(address.sin_addr)))
-				continue;
-#endif
+		// Ignore abusers
+		if (ignoreAddress(inet_ntoa(address.sin_addr)))
+			continue;
+
 		// If we may have to print something, rebuild the peer address buffer
-		if(max_msg_level != MSG_NOPRINT)
+		if (max_msg_level != MSG_NOPRINT)
 			snprintf(peer_address, sizeof(peer_address), "%s:%hu", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
 
+
 		// We print the packet contents if necessary
-		// TODO: print the current time here
 		if(max_msg_level >= MSG_DEBUG)
 		{
-			MsgPrint(MSG_DEBUG, "%s ---> New packet received\n", peer_address);
+			MsgPrint(MSG_DEBUG, "%s ---> @%lld New packet received\n", peer_address, crt_time);
+			MsgPrint(MSG_DEBUG, "=================================\n", peer_address);
 			PrintPacket(packet, nb_bytes);
+			MsgPrint(MSG_DEBUG, "=================================\n\n", peer_address);
 		}
 
 		// A few sanity checks
-		if(nb_bytes < MIN_PACKET_SIZE)
-		{
+		if(nb_bytes < MIN_PACKET_SIZE)		{
 			MsgPrint(MSG_WARNING, "WARNING: rejected packet from %s (size = %d bytes)\n", peer_address, nb_bytes);
 			continue;
 		}
 
-		if(ntohs(address.sin_port) < 1024)
-		{
+		if(ntohs(address.sin_port) < 1024)		{
 			MsgPrint(MSG_WARNING, "WARNING: rejected packet from %s (source port = 0)\n", peer_address);
 			continue;
 		}
 
-		// Append a '\0' to make the parsing easier and update the current time
+		// Append a '\0' to make the parsing easier
 		packet[nb_bytes] = '\0';
-		//crt_time = time(NULL); //hypov8 moved up
 
-
-		//HandleMessage(tcp);
-		if (isTCP) //gamespy listen
+		//Handle Message(tcp);
+		if (isTCP) //TCP GameSpy listen
 		{
-			int validGSM = 0;
-#if 1
-			/* packet sent in strange format, replace '\0' with \*/
+			/* hypov8 packet sent in strange format, replace '\0' with \*/
 			if (packet[0] == '\0' && nb_bytes)
-			{
-				int i;
-				char s = 0;
+				replaceNullChar(packet, nb_bytes);
 
-				for (i = 0; i <= nb_bytes; i++)
-				{
-					s = packet[i];
-					if (s == '\0')	
-						s = '\\';
-
-					/* set last bytes null */
-					if (i == nb_bytes) 
-						s = '\0';
-
-					packet[i] = s;
-				}
-			}
-#endif
-			validGSM = HandleGspyMessage(packet, &address);
-			if (validGSM == 1)
-			{
-					MsgPrint(MSG_DEBUG, "Sent GamespyLite Packet\n");
-			}
-			else if (validGSM == 3)
-			{ 
-				/* must be gslite */
-				MsgPrint(MSG_DEBUG, "Sent GSLite Packet\n");
-			}
-			else
-			{
-				printf("ERROR: NOT GamespyLite Packet\n");
-			}
+			/* process message */
+			HandleGspyMessage(packet, &address);
 
 			// shutdown the connection since we're done
-			if (shutdown(tmpClientOut_tcp, SD_SEND) == SOCKET_ERROR) {
+			if (shutdown(tmpClientOut_tcp, SD_SEND) == SOCKET_ERROR) 
+			{
 				printf("shutdown failed with error: %d\n", WSAGetLastError());
 				SocketError_close(tmpClientOut_tcp);
 			}
-
-			/* close client temporary socket*/
+			else /* close client temporary socket*/
 			SocketError_close(tmpClientOut_tcp);
 
 		}
 		else if (isKPQ3) //kingpinq3
 		{
 			HandleMessageKPQ3(packet + 4, &address); //remove YYYY
-
 		}
-		else //is kingpin
+		else //kingpin
 		{
 			HandleMessage(packet, &address);
 		}
 	}
-
-
 
 	/* close program */
 	return 0;
