@@ -54,6 +54,9 @@
 // Maximum size of a reponse packet
 #define MAX_PACKET_SIZE 1400
 
+//hypov8 block quake 2 etc
+#define KINGPIN_ONLY
+
 
 ////////////////
 //  kp stuff  //
@@ -396,16 +399,15 @@ static void HandleGetServers(const struct sockaddr_in *addr, int isTCP, const ch
 	qboolean        no_full;
 	qboolean		isKingpin;
 	unsigned int    numServers = 0;
-	char * challengeTmp;
 	unsigned char buff[6];
 
-	challengeTmp = "GameSpy";
-	if (challenge)
-		challengeTmp = (char*)challenge;
-	
+#ifdef KINGPIN_ONLY
+	if (!(strcmp(challenge, "kingpin") == 0) && !(strcmp(challenge, "GameSpy") == 0))
+		return;
+#endif	
 
 	if (max_msg_level >= MSG_DEBUG) //hypov8 print b4 debug stuff below
-		MsgPrint(MSG_NORMAL, "%s ---> getservers ( %s )\n", peer_address, challengeTmp); //%d, protocol
+		MsgPrint(MSG_NORMAL, "%s ---> getservers ( %s )\n", peer_address, challenge); //%d, protocol
 
 	no_empty = 0;
 	no_full = 0;
@@ -436,7 +438,7 @@ static void HandleGetServers(const struct sockaddr_in *addr, int isTCP, const ch
 
 				
 			if (max_msg_level <= MSG_NORMAL) //hypov8 print if no debug 
-				MsgPrint(MSG_NORMAL, "%s ---> getservers ( %s ) Servers: %u\n", peer_address, challengeTmp, numServers); //%d, protocol
+				MsgPrint(MSG_NORMAL, "%s ---> getservers ( %s ) Servers: %u\n", peer_address, challenge, numServers); //%d, protocol
 			
 			MsgPrint(MSG_DEBUG, "%s <--- getserversResponse (%u servers)\n", peer_address, numServers);
 
@@ -935,13 +937,21 @@ void HandleMessage(const char *msg, const struct sockaddr_in *address)
 		value = SearchInfostring((const char*)msgTrimmed, "protocol");
 		if (value == NULL)		{
 			MsgPrint(MSG_NORMAL, "%s ---> No protocol in game string\n", peer_address);
-			return;	}
+			return;
+		}
+#ifdef KINGPIN_ONLY
+		else if (!(strcmp(value,"32")==0))	{
+			MsgPrint(MSG_NORMAL, "%s ---> Protocol not 32\n", peer_address); //hypo force kingpin only?
+			return;
+		}
+#endif	
 
 		// Get the server in the list (add it to the list if necessary)
 		server = Sv_GetByAddr(address, qtrue);
 		if (server == NULL) {
 			MsgPrint(MSG_DEBUG, "%s ---> @%lld 'YYYYHeartbeatNo' Server\n", peer_address, crt_time);
-			return;	}
+			return;	
+		}
 
 		server->active = qtrue;
 		server->protocol = atoi(value);
@@ -1070,12 +1080,6 @@ void HandleMessage(const char *msg, const struct sockaddr_in *address)
 		MsgPrint(MSG_DEBUG, "%s ---> @%lld YYYYping\n", peer_address, crt_time);
 		SendAck(server);
 	}
-//client to master. getservers request
-	//else if(!strncmp(C2M_GETSERVERS, msg, strlen(C2M_GETSERVERS)))
-	//{
-	//	MsgPrint(MSG_DEBUG, "%s ---> @%lld get servers kp1\n", peer_address, crt_time);
-	//	HandleGetServers(address, qfalse, 0);
-	//}
 //client to master. getmotd request. ToDo: motd
 	else if(!strncmp(C2M_GETMOTD, msg, strlen(C2M_GETMOTD)))
 	{
@@ -1087,8 +1091,6 @@ void HandleMessage(const char *msg, const struct sockaddr_in *address)
 	{
 		MsgPrint(MSG_NORMAL, "%s ---> invalid packet (%s)\n", peer_address, msg);
 	}
-
-
 }
 
 
@@ -1212,34 +1214,33 @@ Parse a packet to figure out what to do with it
 void HandleGspyMessage(const char *msg, const struct sockaddr_in *address)
 {
 	char *value;
-	const char *challenge = 0;
+	const char *challenge = NULL;
 	char *tmp;
+	int tcp = 1;
 
 // If it's gamespylite inital request
 	if (!strncmp(B2M_INITALCONTACT, msg, strlen(B2M_INITALCONTACT)))
 	{
-		HandleGetServers(address, qtrue,0);
+		HandleGetServers(address, qtrue,"GameSpy");
 		MsgPrint(MSG_DEBUG, "Sent GamespyLite Packet\n");
-		//return 1;
 	}
-
 // old gamespy responce to request. //list//
 	else if (!strncmp(B2M_GETSERVERS, msg, strlen(B2M_GETSERVERS))) 
 	{ // \list\\gamename\kingpinver\01\location\0\validate\LO/WUC4c\final\\queryid\1.1
 
-		// Extract the game id
+		/* Extract the game id */
 		tmp = strstr(msg, "\\gamename");
-		//str
-		value = SearchInfostring((const char*)tmp, "gamename");
-		if (value != NULL)
-		{
-			MsgPrint(MSG_DEBUG, "%s ---> B2M \\list\\ (%s)\n", peer_address, value);
-			challenge = value;
-		}
 
-		HandleGetServers(address, qtrue, challenge);
-		MsgPrint(MSG_DEBUG, "Sent GamespyLite Packet\n");
-		//return 1;
+		challenge = SearchInfostring((const char*)tmp, "gamename");
+		if (challenge != NULL)
+		{
+			MsgPrint(MSG_DEBUG, "%s ---> B2M \\list\\ (%s)\n", peer_address, challenge);
+			HandleGetServers(address, qtrue, challenge);
+			MsgPrint(MSG_DEBUG, "Sent GamespyLite Packet\n");
+		}
+		else
+			MsgPrint(MSG_DEBUG, "INVALID: gamename\n");
+
 	}
 //gslist server requests.
 	else if(!strncmp(B2M_GETSERVERS_GSLIST2, msg, strlen(B2M_GETSERVERS_GSLIST2)))
@@ -1248,33 +1249,29 @@ void HandleGspyMessage(const char *msg, const struct sockaddr_in *address)
 		//kingpin            QFWxY2
 		//quake2             rtW0xg
 
-		//const char *challenge = 0;
-		char  packet[MAX_PACKET_SIZE + 1];
-		int tcp = 1;
-		//char *tmp;
-
-		memset(packet, 0, sizeof(packet)); //reset packet, prevent any issues
-
-		/*// Extract encrypt type    \\enctype\\0\*/
+		/* Extract encrypt type    \\enctype\\0\ */
 		value = SearchInfostring(msg, "enctype");
 		if (value != NULL)
-			if (value[0] == '0')	
+		{
+			if (value[0] == '0')
 				tcp = 2;
+		}
 
 		tmp = strstr(msg, "\\list\\cmp");
-		value = SearchInfostring((const char*)tmp, "gamename");
-		if (value != NULL)
-			challenge = value;
-
-		HandleGetServers(address, tcp, challenge);
-		MsgPrint(MSG_DEBUG, "Sent GSLite Packet\n");
-		//return 3;
+		challenge = SearchInfostring((const char*)tmp, "gamename");
+		if (challenge != NULL)
+		{
+			HandleGetServers(address, tcp, challenge);
+			MsgPrint(MSG_DEBUG, "Sent GSLite Packet\n");
+		}
+		else
+			MsgPrint(MSG_DEBUG, "INVALID: gamename\n");
 	}
 	else //error
 	{
 		MsgPrint(MSG_NORMAL, "%s ---> invalid GameSpy (%s)\n", peer_address, msg);
 		printf("ERROR: NOT GamespyLite Packet\n");
-		//return 0;
+
 	}
 }
 
