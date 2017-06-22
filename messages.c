@@ -379,12 +379,12 @@ char *fixStringToLongError(const char* msg)
 
 /*
 ====================
-HandleGetServers
+HandleGetServersGSpy
 
 Parse getservers requests and send the appropriate response
 ====================
 */
-static void HandleGetServers(const struct sockaddr_in *addr, int isTCP, const char* challenge)
+static void HandleGetServersGSpy(const struct sockaddr_in *addr, int isTCP, const char* challenge)
 {
 	const char     *packetheader = "";
 	const size_t    headersize = strlen(packetheader);
@@ -402,7 +402,9 @@ static void HandleGetServers(const struct sockaddr_in *addr, int isTCP, const ch
 	unsigned char buff[6];
 
 #ifdef KINGPIN_ONLY
-	if (!(strcmp(challenge, "kingpin") == 0) && !(strcmp(challenge, "GameSpy") == 0))
+	if (!(strcmp(challenge, "kingpin") == 0) &&
+		!(strcmp(challenge, "GameSpy") == 0) && 
+		!(strcmp(challenge, "kingpinQ3") == 0))
 		return;
 #endif	
 
@@ -1221,7 +1223,7 @@ void HandleGspyMessage(const char *msg, const struct sockaddr_in *address)
 // If it's gamespylite inital request
 	if (!strncmp(B2M_INITALCONTACT, msg, strlen(B2M_INITALCONTACT)))
 	{
-		HandleGetServers(address, qtrue,"GameSpy");
+		HandleGetServersGSpy(address, qtrue, "GameSpy");
 		MsgPrint(MSG_DEBUG, "Sent GamespyLite Packet\n");
 	}
 // old gamespy responce to request. //list//
@@ -1235,7 +1237,7 @@ void HandleGspyMessage(const char *msg, const struct sockaddr_in *address)
 		if (challenge != NULL)
 		{
 			MsgPrint(MSG_DEBUG, "%s ---> B2M \\list\\ (%s)\n", peer_address, challenge);
-			HandleGetServers(address, qtrue, challenge);
+			HandleGetServersGSpy(address, qtrue, challenge);
 			MsgPrint(MSG_DEBUG, "Sent GamespyLite Packet\n");
 		}
 		else
@@ -1261,7 +1263,7 @@ void HandleGspyMessage(const char *msg, const struct sockaddr_in *address)
 		challenge = SearchInfostring((const char*)tmp, "gamename");
 		if (challenge != NULL)
 		{
-			HandleGetServers(address, tcp, challenge);
+			HandleGetServersGSpy(address, tcp, challenge);
 			MsgPrint(MSG_DEBUG, "Sent GSLite Packet\n");
 		}
 		else
