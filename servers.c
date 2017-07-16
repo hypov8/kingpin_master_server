@@ -111,7 +111,7 @@ static qboolean Sv_ResolveAddr(const char *name, struct sockaddr_in *addr)
 	struct hostent *host;
 
 	// Create a work copy
-	namecpy = _strdup(name);
+	namecpy = x_strdup(name);
 	if(namecpy == NULL)
 	{
 		MsgPrint(MSG_ERROR, "ERROR: can't allocate enough memory to resolve %s\n", name);
@@ -469,7 +469,7 @@ server_t       *Sv_GetByAddr(const struct sockaddr_in *address, qboolean add_it)
 	hash_table[hash] = sv;
 	nb_servers++;
 
-	MsgPrint(MSG_NORMAL, "%s ---+ New server added ( %u servers registered )\n", peer_address, nb_servers);
+	MsgPrint(MSG_NORMAL, "%s ---+ New server added ( %u server registered )\n", peer_address, nb_servers);
 	MsgPrint(MSG_DEBUG, "  - index: %u\n" "  - hash: 0x%02X\n", last_alloc, hash);
 
 	return sv;
@@ -558,7 +558,7 @@ qboolean Sv_AddAddressMapping(const char *mapping)
 	addrmap_t      *addrmap;
 
 	// Get a working copy of the mapping string
-	map_string = _strdup(mapping);
+	map_string = x_strdup(mapping);
 	if(map_string == NULL)
 	{
 		MsgPrint(MSG_ERROR, "ERROR: can't allocate address mapping string\n");
@@ -584,8 +584,8 @@ qboolean Sv_AddAddressMapping(const char *mapping)
 		return qfalse;
 	}
 	memset(addrmap, 0, sizeof(*addrmap));
-	addrmap->from_string = _strdup(map_string);
-	addrmap->to_string = _strdup(to_ip);
+	addrmap->from_string = x_strdup(map_string);
+	addrmap->to_string = x_strdup(to_ip);
 	if(addrmap->from_string == NULL || addrmap->to_string == NULL)
 	{
 		MsgPrint(MSG_ERROR, "ERROR: can't allocate address mapping strings\n");

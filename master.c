@@ -38,14 +38,15 @@
 // ---------- Constants ---------- //
 
 // Version of dpmaster
-#define VERSION "1.6"
+#define VERSION "1.6.01" //hypo
 
 // Default master port
 #define DEFAULT_MASTER_PORT 27900 //28900 hypo kp1
 #define DEFAULT_MASTER_PORT_KPQ3 27950 //kpq3 master port
+#define DEFAULT_MASTER_PORT_GAMESPY 28900 //GameSpy master port
 
 // Maximum and minimum sizes for a valid packet
-#define MAX_PACKET_SIZE 2048
+#define MAX_PACKET_SIZE 2048 //hypo ToDo: should we need to check for split packets? gamespy?
 #define MIN_PACKET_SIZE 5
 
 #ifndef WIN32
@@ -69,6 +70,7 @@ typedef int     socklen_t;
 // The port we use
 static unsigned short master_port = DEFAULT_MASTER_PORT;
 static unsigned short master_port_kpq3 = DEFAULT_MASTER_PORT_KPQ3;
+static unsigned short master_port_gs = DEFAULT_MASTER_PORT_GAMESPY;
 
 // Local address we listen on, if any
 static const char *listen_name = NULL;
@@ -89,16 +91,17 @@ static const char *low_priv_user = DEFAULT_LOW_PRIV_USER;
 // ---------- Public variables ---------- //
 
 // The master socket
+SOCKET_NET		inSock = INVALID_SOCKET; // listen kp port
+SOCKET_NET		inSock_kpq3 = INVALID_SOCKET; //listen kpq3 port
+#ifdef USE_ALT_OUTPORT
+SOCKET_NET		outSock			 = INVALID_SOCKET; // out kp
+SOCKET_NET		outSock_kpq3	 = INVALID_SOCKET; // out kpq3
+#endif
+SOCKET_NET		inSock_tcp = INVALID_SOCKET; // in tcp
+SOCKET_NET		tmpClientOut_tcp = INVALID_SOCKET; //used for gamespylite tempory client connection
 
-SOCKET		inSock			 = INVALID_SOCKET; // listen kp port
-SOCKET		inSock_kpq3		 = INVALID_SOCKET; //listen kpq3 port
-SOCKET		outSock			 = INVALID_SOCKET; // out kp
-SOCKET		outSock_kpq3	 = INVALID_SOCKET; // out kpq3
-SOCKET		inSock_tcp		 = INVALID_SOCKET; // in tcp
-SOCKET		tmpClientOut_tcp = INVALID_SOCKET; //used for gamespylite tempory client connection
-
-
-
+//SOCKET_NET A_Sockets[4];
+// A_Sockets[0] = inSock;
 
 // The current time (updated every time we receive a packet)
 time_t          crt_time;
@@ -160,7 +163,7 @@ SocketError_close
 close socket, depending on compiler
 ====================
 */
-static void SocketError_close(SOCKET old_socket)
+static void SocketError_close(SOCKET_NET old_socket)
 {
 #ifdef WIN32
 	closesocket(old_socket);
@@ -170,6 +173,13 @@ static void SocketError_close(SOCKET old_socket)
 
 }
 
+/*
+====================
+FloodIpStoreReject
+
+Close TCP Socket with client flood
+====================
+*/
 static qboolean FloodIpStoreReject( struct sockaddr_in *address )
 {
 	int i, j;
@@ -177,32 +187,24 @@ static qboolean FloodIpStoreReject( struct sockaddr_in *address )
 	i = client.currentNum;
 	j = 0;
 	do 
-	{	/* never been alocated. dont try to refrence it */
-		if (cli_info[i].from == NULL)
-		{
-			; //null
-		} 
+	{
 		/*check if client exists*/
-		else if (cli_info[i].from->sin_addr.S_un.S_addr == address->sin_addr.S_un.S_addr/* &&
-			cli_info[i].from->sin_port == address->sin_port	*/)
+		if ( !(cli_info[i].from == NULL) && 
+			cli_info[i].from->sin_addr.s_addr == address->sin_addr.s_addr)
 		{
-			cli_info[i].count++;
-			if (cli_info[i].lastPingTime > crt_time - 2)
-				cli_info[i].count++;
-			else if (cli_info[i].lastPingTime  < crt_time)
-			{
+			if (cli_info[i].lastPingTime  < crt_time)	{
 				cli_info[i].lastPingTime = crt_time;
 				cli_info[i].count = 0;
 			}
 
-			if (cli_info[i].count > 5)
-			{
-				cli_info[i].lastPingTime = crt_time + 5;
-				//cli_info[i].count = 0;
-				return qtrue;
+			if (cli_info[i].count > 5)	{
+				cli_info[i].lastPingTime = crt_time + 3;
+				return qtrue; //flood. ignore
 			}
 
-			return qfalse;
+			cli_info[i].lastPingTime += 2;
+			cli_info[i].count++;
+			return qfalse; //return servers
 		}
 
 		i++;
@@ -565,34 +567,43 @@ static qboolean SecureInit(void)
 	if(!Sv_Init())
 		return qfalse;
 
-	// create sockets. kp1, out, kpq3
+	MsgPrint(MSG_NORMAL, "-==========================================-\n");
+
+	////////////////////////////////////////////////////////
+	// create sockets.
+	////////////////////////////////////////////////////////
+	/* kp1 */
 	inSock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if(inSock < 0)	{
 		MsgPrint(MSG_ERROR, "ERROR: inSocket creation failed (%s)\n", strerror(errno));
 		return qfalse;
 	}
-
+#ifdef USE_ALT_OUTPORT
 	outSock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if(outSock < 0)	{
 		MsgPrint(MSG_ERROR, "ERROR: outSocket creation failed (%s)\n", strerror(errno));
 		return qfalse;
 	}
-	
-	outSock_kpq3 = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if (outSock_kpq3 < 0)	{
-		MsgPrint(MSG_ERROR, "ERROR: outSocket_kpq3 creation failed (%s)\n", strerror(errno));
-		return qfalse;
-	}
-
-	/* hypov8 make new port for kpq3 specific */
+#endif	
+	/* kpq3 */
 	inSock_kpq3 = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (inSock_kpq3 < 0)	{
 		MsgPrint(MSG_ERROR, "ERROR: inSocket_kpq3 creation failed (%s)\n", strerror(errno));
 		return qfalse;
 	}
-
-	// Bind it to the master port
+#ifdef USE_ALT_OUTPORT
+	outSock_kpq3 = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (outSock_kpq3 < 0)	{
+		MsgPrint(MSG_ERROR, "ERROR: outSocket_kpq3 creation failed (%s)\n", strerror(errno));
+		return qfalse;
+	}
+#endif
+	////////////////////////////////////////////////////////
+	//  Bind it to the ports
+	////////////////////////////////////////////////////////
 	memset(&address, 0, sizeof(address));
+
+	/* kp1 */
 	address.sin_family = AF_INET;
 	if(listen_name != NULL)
 	{
@@ -602,7 +613,6 @@ static qboolean SecureInit(void)
 	else
 		address.sin_addr.s_addr = htonl(INADDR_ANY);
 
-// UDP KP1
 	address.sin_port = htons(master_port);
 	if(bind(inSock, (struct sockaddr *)&address, sizeof(address)) != 0)
 	{
@@ -611,10 +621,9 @@ static qboolean SecureInit(void)
 		return qfalse;
 	}
 	MsgPrint(MSG_NORMAL, "Listening   UDP port %hu -=(  Kingpin  )=-\n", ntohs(address.sin_port));
-//END UDP KP1
 
 
-// UDP KPQ3
+	/* KPQ3 */
 	address.sin_port = htons(master_port_kpq3);
 	if (bind(inSock_kpq3, (struct sockaddr *)&address, sizeof(address)) != 0)
 	{
@@ -623,10 +632,10 @@ static qboolean SecureInit(void)
 		return qfalse;
 	}
 	MsgPrint(MSG_NORMAL, "Listening   UDP port %hu -=( KingpinQ3 )=-\n", ntohs(address.sin_port));
-//END UDP KPQ3
 
 
-// UDP OUT KPQ3
+#ifdef USE_ALT_OUTPORT //hypo do we need this, may cause issues?
+	// UDP OUT KPQ3
 	// Deliberately use a different port for outgoing traffic in order
 	// to confuse NAT UDP "connection" tracking and thus delist servers
 	// hidden by NAT
@@ -638,41 +647,41 @@ static qboolean SecureInit(void)
 		return qfalse;
 	}
 	MsgPrint(MSG_NORMAL, "Server out  UDP port %hu -=( KingpinQ3 )=-\n", ntohs(address.sin_port));
-//END UDP OUT KPQ3
+	//END UDP OUT KPQ3
 
 
-// UDP OUT
+	// UDP OUT
 	// Deliberately use a different port for outgoing traffic in order
 	// to confuse NAT UDP "connection" tracking and thus delist servers
 	// hidden by NAT
 	address.sin_port = htons(master_port + 1);
-	if(bind(outSock, (struct sockaddr *)&address, sizeof(address)) != 0)
-	{
+
+	if(bind(outSock, (struct sockaddr *)&address, sizeof(address)) != 0)	{
 		MsgPrint(MSG_ERROR, "ERROR: socket binding failed (%s)\n", strerror(errno));
 		SocketError_close(outSock);
 		return qfalse;
 	}
 	MsgPrint(MSG_NORMAL, "Server out  UDP port %hu -=(  Kingpin  )=-\n", ntohs(address.sin_port));
-//END UDP OUT
-
+	//END UDP OUT
+#endif
 
 ////////////////////////////////////////////////////////
-//listen on TCP for gamespy
+// listen on TCP for gamespy
 ////////////////////////////////////////////////////////
-	inSock_tcp = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP); //hypov8
+	inSock_tcp = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP); //hypov8
 	if (inSock_tcp == INVALID_SOCKET)
 	{
-		printf("Server: Error at socket(): %ld\n", WSAGetLastError());
+		printf("Server: Error at socket(): %i\n", ERRORNUM);
 		SocketError_close(inSock_tcp);
-		return 0;
+		return qfalse;
 	}
 
 	//sockaddr_in service;
 	address.sin_family = AF_INET;
 	address.sin_addr.s_addr = htonl(INADDR_ANY);
-	address.sin_port = htons(master_port + 1000);
+	address.sin_port = htons(master_port_gs); // master_port + 1000); //hypov8 todo: add startup cmd switch?
 
-	if (bind(inSock_tcp,  (struct sockaddr *)&address, sizeof(address)) != 0)
+	if (bind(inSock_tcp, (struct sockaddr *)&address, sizeof(address)) != 0)
 	{
 		MsgPrint(MSG_ERROR, "ERROR: socket binding failed (%s)\n", strerror(errno));
 		SocketError_close(inSock_tcp);
@@ -680,21 +689,19 @@ static qboolean SecureInit(void)
 	}
 	MsgPrint(MSG_NORMAL, "Listening   TCP port %hu -=(  gamespy  )=-\n", ntohs(address.sin_port));
 
-
-
-	if (listen(inSock_tcp, 10) == SOCKET_ERROR)
+	if (listen(inSock_tcp, 10) == SOCKET_ERROR) //hypo todo: test. is 10 enough?
 	{
-		printf("listen(): Error listening on socket %ld.\n", WSAGetLastError());
+		printf("listen(): Error listening on socket %i.\n", ERRORNUM);
 		SocketError_close(inSock_tcp);
 		return qfalse;
-	}
-	else
-	{
-		printf("listen() is OK, I'm waiting for connections...\n");
 	}
 ///////////////
 //end tcp
 ///////////////
+
+		MsgPrint(MSG_NORMAL, "-==========================================-\n");
+		printf("listen() is OK, I'm waiting for connections...\n");
+
 
 	return qtrue;
 } 
@@ -730,7 +737,6 @@ typedef struct
 
 static time_t   lastParseTime = 0;
 static int      numIgnoreAddresses = 0;
-static int      numIPRename = 0; //hypov8 ip rename
 static ignoreAddress_t *ignoreAddresses = NULL;
 static ignoreAddress_t *ipAddresses = NULL; //hypov8 ip rename
 
@@ -744,7 +750,7 @@ static qboolean parseIgnoreAddress(void) //hypov8 will allways load file when a 
 	int             numAllocIgnoreAddresses = 1;
 	FILE           *f = NULL;
 	int             i;
-	boolean			skipLine;
+	qboolean			skipLine;
 
 	// Only reparse periodically
 	if(crt_time - lastParseTime < PARSE_INTERVAL)
@@ -792,7 +798,7 @@ static qboolean parseIgnoreAddress(void) //hypov8 will allways load file when a 
 		if (c != EOF)
 		{
 			memset(buffer, 0, sizeof(buffer)); //hypov8 reset buffer length to zero
-			skipLine = FALSE; //add hypo allow comments
+			skipLine = qfalse; //add hypo allow comments
 			do
 			{
 				if (i >= ADDRESS_LENGTH)
@@ -814,7 +820,7 @@ static qboolean parseIgnoreAddress(void) //hypov8 will allways load file when a 
 					char tmpBuff[256];
 					buffer[i] = '\0';
 					fgets(tmpBuff, 256, f); //goto next line in file
-					skipLine = TRUE; //comment line
+					skipLine = qtrue; //comment line
 					break;
 				}
 
@@ -896,7 +902,7 @@ static void parseIPConversion(void) //hypov8 file loaded at start?
 //	int             numAllocIPAddresses = 1;
 	FILE           *f = NULL;
 	int             i;
-	boolean			skipLine;
+	qboolean			skipLine;
 
 	//last_dns_time = crt_time;
 
@@ -934,7 +940,7 @@ static void parseIPConversion(void) //hypov8 file loaded at start?
 		if (c != EOF)
 		{
 			memset(buffer, 0, sizeof(buffer)); //hypov8 reset buffer length to zero
-			skipLine = FALSE; //add hypo allow comments
+			skipLine = qfalse; //add hypo allow comments
 			do
 			{
 				if (i >= ADDRESS_LENGTHIPADD)
@@ -956,7 +962,7 @@ static void parseIPConversion(void) //hypov8 file loaded at start?
 					char tmpBuff[256];
 					buffer[i] = '\0';
 					fgets(tmpBuff, 256, f); //goto next line in file
-					skipLine = TRUE; //comment line
+					skipLine = qtrue; //comment line
 					break;
 				}
 
@@ -1033,12 +1039,12 @@ void replaceNullChar(char packet[1024], int packet_len)
 }
 
 //compatability??
-void Sys_Sleep(void)
+void Sys_Sleep(int ms)
 {
 #ifdef _WIN32
-	Sleep(100);
+	Sleep((DWORD)ms);
 #else
-	usleep(100000);
+	usleep(1000*ms);
 #endif
 
 }
@@ -1055,15 +1061,14 @@ int main(int argc, const char *argv[])
 	struct sockaddr_in address;
 	socklen_t       addrlen;
 	int             nb_bytes;
-	SOCKET             sock; 
+	SOCKET_NET      sock;
 	char            packet[MAX_PACKET_SIZE + 1];	// "+ 1" because we append a '\0'
 	qboolean        valid_options;
 	fd_set          rfds;
 	struct timeval  tv;
-	//hypo
 	qboolean isTCP, isKPQ3;
 	int iSendResult;
-	//time_t       last_dns_time;
+	SOCKET_NET fd_sok;
 
 	signal(SIGINT, cleanUp);
 	signal(SIGTERM, cleanUp);
@@ -1096,15 +1101,29 @@ int main(int argc, const char *argv[])
 		FD_SET(inSock, &rfds);
 		FD_SET(inSock_kpq3, &rfds);
 		FD_SET(inSock_tcp, &rfds);
+#ifdef USE_ALT_OUTPORT
 		FD_SET(outSock, &rfds);
 		FD_SET(outSock_kpq3, &rfds);
+#endif
 		tv.tv_sec = tv.tv_usec = 0;
 
+		//pick highest socket. hypo note: dont know why it works, but it does :)
+		fd_sok = inSock;
+		if (inSock_kpq3 > fd_sok)
+			fd_sok = inSock_kpq3;
+		if (inSock_tcp > fd_sok)
+			fd_sok = inSock_tcp;
+#ifdef USE_ALT_OUTPORT
+		if (outSock > fd_sok)
+			fd_sok = outSock;
+		if (outSock_kpq3 > fd_sok)
+			fd_sok = outSock_kpq3;
+#endif
+
 		// Check for new data every 100ms
-		//if(select(max(inSock, outSock) + 1, &rfds, NULL, NULL, &tv) <= 0)
-		if (select(0, &rfds, NULL, NULL, &tv) <= 0)
+		if (select(fd_sok+1, &rfds, NULL, NULL, &tv) <= 0)
 		{
-			Sys_Sleep();
+			Sys_Sleep(100); //100 milliseconds
 			continue;
 		}
 
@@ -1123,6 +1142,7 @@ int main(int argc, const char *argv[])
 			isTCP = 1;
 			sock = inSock_tcp;
 		}
+#ifdef USE_ALT_OUTPORT
 		else if (FD_ISSET(outSock, &rfds))	{
 			sock = outSock;
 		}
@@ -1130,6 +1150,7 @@ int main(int argc, const char *argv[])
 			isKPQ3 = 1;
 			sock = outSock_kpq3;
 		}
+#endif
 		else
 			continue;
 	
@@ -1150,7 +1171,7 @@ int main(int argc, const char *argv[])
 
 			tmpClientOut_tcp = accept(sock, (struct sockaddr *)&address, (socklen_t*)&addrlen);
 			if (tmpClientOut_tcp == INVALID_SOCKET)		{
-				printf("accept failed with error: %d\n", WSAGetLastError());
+				printf("accept failed with error: %i\n", ERRORNUM);
 				SocketError_close(tmpClientOut_tcp);
 				continue;
 			}
@@ -1172,14 +1193,14 @@ int main(int argc, const char *argv[])
 			iSendResult = send(tmpClientOut_tcp, 0, 0, 0);
 			iSendResult = send(tmpClientOut_tcp, echo, strlen(echo), 0);
 			if (iSendResult == SOCKET_ERROR) 	{
-				printf("send failed with error: %d\n", WSAGetLastError());
+				printf("send failed with error: %i\n", ERRORNUM);
 				SocketError_close(tmpClientOut_tcp);
 				continue; // return 1;
 			}
 
 			nb_bytes = recv(tmpClientOut_tcp, packet, MAX_PACKET_SIZE, 0);
 			if (nb_bytes == SOCKET_ERROR)	{
-				printf("send failed with error: %d\n", WSAGetLastError());
+				printf("receive failed with error: %i\n", ERRORNUM);
 				SocketError_close(tmpClientOut_tcp);
 				continue;
 			}
@@ -1221,9 +1242,9 @@ int main(int argc, const char *argv[])
 		if(max_msg_level >= MSG_DEBUG)
 		{
 			MsgPrint(MSG_DEBUG, "%s ---> @%lld New packet received\n", peer_address, crt_time);
-			MsgPrint(MSG_DEBUG, "=================================\n", peer_address);
+			MsgPrint(MSG_DEBUG, "=================================================\n", peer_address);
 			PrintPacket(packet, nb_bytes);
-			MsgPrint(MSG_DEBUG, "=================================\n\n", peer_address);
+			MsgPrint(MSG_DEBUG, "=================================================\n\n", peer_address);
 		}
 
 		// A few sanity checks
@@ -1250,13 +1271,11 @@ int main(int argc, const char *argv[])
 			/* process message */
 			HandleGspyMessage(packet, &address);
 
-			// shutdown the connection since we're done
-			if (shutdown(tmpClientOut_tcp, SD_SEND) == SOCKET_ERROR) 
-			{
-				printf("shutdown failed with error: %d\n", WSAGetLastError());
-				SocketError_close(tmpClientOut_tcp);
-			}
-			else /* close client temporary socket*/
+			/* shutdown the connection since we're done */
+			if (shutdown(tmpClientOut_tcp, TCP_SHUTBOTH) == SOCKET_ERROR)
+				printf("shutdown client TCP failed with error: %i\n", ERRORNUM);
+			
+			 /* close client temporary socket */
 			SocketError_close(tmpClientOut_tcp);
 
 		}
@@ -1269,6 +1288,9 @@ int main(int argc, const char *argv[])
 			HandleMessage(packet, &address);
 		}
 	}
+
+	/* allow enough time to spot error */
+	Sys_Sleep(500); //500 milliseconds
 
 	/* close program */
 	return 0;

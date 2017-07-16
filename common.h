@@ -41,6 +41,8 @@
 # include <sys/socket.h>
 #endif
 
+//#define USE_ALT_OUTPORT
+
 
 // ---------- Types ---------- //
 
@@ -67,12 +69,21 @@ typedef enum
 // ---------- Public variables ---------- //
 
 // The master socket
-extern SOCKET		inSock;
-extern SOCKET		inSock_kpq3; //listen on kpq3 port
-extern SOCKET		outSock;
-extern SOCKET		outSock_kpq3; // out kpq3
-extern SOCKET		inSock_tcp;
-extern SOCKET		tmpClientOut_tcp; //used for gamespylite tempory client connection
+#ifdef WIN32
+typedef SOCKET SOCKET_NET;
+//#define SOCKET_NET SOCKET;
+#else
+typedef int SOCKET_NET;
+#endif
+
+extern SOCKET_NET	inSock;
+extern SOCKET_NET		inSock_kpq3; //listen on kpq3 port
+#ifdef USE_ALT_OUTPORT
+extern SOCKET_NET		outSock;
+extern SOCKET_NET		outSock_kpq3; // out kpq3
+#endif
+extern SOCKET_NET		inSock_tcp;
+extern SOCKET_NET		tmpClientOut_tcp; //used for gamespylite tempory client connection
 
 // The current time (updated every time we receive a packet)
 extern time_t   crt_time;
@@ -88,7 +99,22 @@ extern char     peer_address[128];
 
 // Win32 uses a different name for some standard functions
 #ifdef WIN32
-# define snprintf _snprintf
+# define snprintf		_snprintf
+#define TCP_SHUTRECV	SD_RECEIVE
+#define TCP_SHUTSEND	SD_SEND
+#define TCP_SHUTBOTH	SD_BOTH
+#define ERRORNUM		WSAGetLastError()
+#define x_strdup		_strdup
+#define x_strcmpi		_strcmpi
+#else
+#define TCP_SHUTRECV	SHUT_RD
+#define TCP_SHUTSEND	SHUT_WR
+#define TCP_SHUTBOTH	SHUT_RDWR
+#define ERRORNUM		errno  //hypo ToDo: test
+#define SOCKET_ERROR	-1
+#define INVALID_SOCKET	-1
+#define	x_strdup		strdup
+#define x_strcmpi		strcasecmp
 #endif
 
 #ifndef max

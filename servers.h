@@ -62,6 +62,7 @@ typedef struct server_s
 	char            challenge[CHALLENGE_MAX_LENGTH];
 	unsigned short  nbclients;
 	unsigned short  maxclients;
+	unsigned short  gsPort;		//hypov8 store kingpin game port
 	time_t          timeout;
 	time_t          challenge_timeout;
 	const struct addrmap_s *addrmap;
