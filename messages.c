@@ -71,6 +71,7 @@
 #define S2M_PING_YYYY			"ÿÿÿÿping"				//recieved ping (initilized server...)
 #define S2M_PRINT_YYYY			"ÿÿÿÿprint\n"			//recieved print (after sending status...)
 #define S2M_ERROR_STR			"Info string length exceeded\n" //fix strings to long. game port send limitation
+#define S2M_FINAL				"\\final\\\\queryid\\"			//kingpin.exe responce to ack packet
 
 // master to server
 #define M2S_GETSTATUS_GS	"\\status\\"	//send status GS packet
@@ -247,11 +248,11 @@ static void SendGetStatus_Gamespy(const struct sockaddr_in *ServerAddress)
 #else
 	if (sendto(inSock, msg, strlen(msg), 0, (const struct sockaddr *)ServerAddress, sizeof(*ServerAddress)))
 #endif
-		MsgPrint(MSG_DEBUG, "%s:%hu <--- '\\\\status\\\\' ( GameSpy Port )\n", inet_ntoa(ServerAddress->sin_addr), ntohs(ServerAddress->sin_port));
+		MsgPrint(MSG_DEBUG, "%s:%hu <--- '\\\\status\\\\' Sent ( GameSpy Port )\n", inet_ntoa(ServerAddress->sin_addr), ntohs(ServerAddress->sin_port));
 
 	netfail = ERRORNUM;
 	if (netfail)
-		MsgPrint(MSG_WARNING, "%s <--- '\\\\status\\\\'--== WSAGetLastError ==-- \"%i\"\n", peer_address, netfail);
+		MsgPrint(MSG_WARNING, "%s <--- '\\\\status\\\\'--== Socket Error ==-- \"%i\"\n", peer_address, netfail);
 }
 
 /*
@@ -279,11 +280,11 @@ static void SendGetStatus(server_t * server)
 #else
 	if (sendto(inSock, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)))
 #endif
-		MsgPrint(MSG_DEBUG, "%s <--- 'YYYYstatus'\n", peer_address);
+		MsgPrint(MSG_DEBUG, "%s <--- 'YYYYstatus' Sent (Game Port)\n", peer_address);
 
 	netfail = ERRORNUM;
 	if (netfail)
-		MsgPrint(MSG_WARNING, "%s <--- 'YYYYstatus'--== WSAGetLastError ==-- \"%i\"\n", peer_address, netfail);
+		MsgPrint(MSG_WARNING, "%s <--- 'YYYYstatus'--== Socket Error ==-- \"%i\"\n", peer_address, netfail);
 }
 
 
@@ -328,11 +329,11 @@ static void SendPing(server_t * server)
 #else
 	if (sendto(inSock, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)))
 #endif
-		MsgPrint(MSG_DEBUG, "%s <--- 'Ping' sent\n", peer_address);
+		MsgPrint(MSG_DEBUG, "%s <--- 'YYYYPing' Sent (Game Port)\n", peer_address);
 
 	netfail = ERRORNUM;
 	if (netfail)
-		MsgPrint(MSG_WARNING, "%s <--- 'Ping'--== WSAGetLastError ==-- \"%i\"\n", peer_address, netfail);
+		MsgPrint(MSG_WARNING, "%s <--- 'YYYYPing'--== Socket Error ==-- \"%i\"\n", peer_address, netfail);
 }
 
 //kingpin
@@ -347,11 +348,11 @@ static void SendAck(server_t * server)
 #else
 	if (sendto(inSock, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)))
 #endif
-		MsgPrint(MSG_DEBUG, "%s <--- 'Ack' sent\n", peer_address);
+		MsgPrint(MSG_DEBUG, "%s <--- 'YYYYAck' Sent (Game Port)\n", peer_address);
 
 	netfail = ERRORNUM;
 	if (netfail)
-		MsgPrint(MSG_DEBUG, "%s <--- 'Ack'--== WSAGetLastError ==-- \"%i\"\n", peer_address, netfail);
+		MsgPrint(MSG_DEBUG, "%s <--- 'YYYYAck'--== Socket Error ==-- \"%i\"\n", peer_address, netfail);
 
 }
 
@@ -371,11 +372,11 @@ static void SendAckGS(server_t * server)
 #else
 	if (sendto(inSock, msg, strlen(msg), 0, (struct sockaddr *)&tmpServerAddress, sizeof(tmpServerAddress)))
 #endif
-		MsgPrint(MSG_DEBUG, "%s <--- '\\\\Ack\\\\' sent\n", peer_address);
+		MsgPrint(MSG_DEBUG, "%s <--- '\\\\Ack\\\\' Sent (GameSpy Port)\n", peer_address);
 
 	netfail = ERRORNUM;
 	if (netfail)
-		MsgPrint(MSG_DEBUG, "%s <--- '\\\\Ack\\\\'--== WSAGetLastError ==-- \"%i\"\n", peer_address, netfail);
+		MsgPrint(MSG_DEBUG, "%s <--- '\\\\Ack\\\\'--== Socket Error ==-- \"%i\"\n", peer_address, netfail);
 
 }
 
@@ -1057,6 +1058,12 @@ void HandleMessage(const char *msg, const struct sockaddr_in *address)
 		//hypo reply to server. acknowledge packet recieved
 		SendAckGS(server); //ToDo: check gs? 
 	}
+// responce to ack  //final////queryid//
+	else if (!strncmp(S2M_FINAL, msg, strlen(S2M_FINAL)))
+	{
+		//do nothing
+		MsgPrint(MSG_DEBUG, "%s --->  //final//queryid kp1\n", peer_address);
+	}
 //end Gamespy packets
 
 
@@ -1088,7 +1095,7 @@ void HandleMessage(const char *msg, const struct sockaddr_in *address)
 		// Get the server in the list (add it to the list if necessary)
 		server = Sv_GetByAddr(address, qtrue);
 		if (server == NULL) {
-			MsgPrint(MSG_DEBUG, "%s ---> @%lld 'YYYYHeartbeatNo' Server\n", peer_address, crt_time);
+			MsgPrint(MSG_DEBUG, "%s ---> @%lld 'YYYYHeartbeat No' Server\n", peer_address, crt_time);
 			return;	
 		}
 
@@ -1159,13 +1166,13 @@ void HandleMessage(const char *msg, const struct sockaddr_in *address)
 				return;
 			}
 			server->timeout = crt_time + TIMEOUT_INFORESPONSE;
-			MsgPrint(MSG_DEBUG, "%s --->  @%lld YYYYShutdown\n", peer_address, crt_time);
+			MsgPrint(MSG_DEBUG, "%s --->  @%lld 'YYYYShutdown' \n", peer_address, crt_time);
 			SendGetStatus(server);
 			return;
 		}
 
 		server->timeout = crt_time + TIMEOUT_PING;
-		MsgPrint(MSG_DEBUG, "%s ---> @%lld YYYYShutdown\n", peer_address, crt_time);
+		MsgPrint(MSG_DEBUG, "%s ---> @%lld 'YYYYShutdown' \n", peer_address, crt_time);
 
 		/* check if server is active or shutdown */
 		SendPing(server);
@@ -1175,7 +1182,7 @@ void HandleMessage(const char *msg, const struct sockaddr_in *address)
 	{
 		server = Sv_GetByAddr(address, qfalse);
 		if (server == NULL) {
-			MsgPrint(MSG_DEBUG, "%s ---> @%lld YYYYack. No Server\n", peer_address, crt_time);
+			MsgPrint(MSG_DEBUG, "%s ---> @%lld 'YYYYAck' No Server\n", peer_address, crt_time);
 			return;		
 		}
 
@@ -1191,7 +1198,7 @@ void HandleMessage(const char *msg, const struct sockaddr_in *address)
 			server = Sv_GetByAddr(address, qtrue);
 			if (server == NULL)
 			{
-				MsgPrint(MSG_DEBUG, "%s ---> @%lld YYYYping. No Server\n", peer_address, crt_time);
+				MsgPrint(MSG_DEBUG, "%s ---> @%lld 'YYYYPing' No Server\n", peer_address, crt_time);
 				return;	
 			}
 
@@ -1200,7 +1207,7 @@ void HandleMessage(const char *msg, const struct sockaddr_in *address)
 				server->gsPort = ntohs(server->address.sin_port) - (u_short)10;
 
 			server->timeout = crt_time + TIMEOUT_INFORESPONSE;
-			MsgPrint(MSG_DEBUG, "%s --->  @%lld YYYYPing. New Server", peer_address, crt_time);
+			MsgPrint(MSG_DEBUG, "%s --->  @%lld 'YYYYPing' New Server", peer_address, crt_time);
 			SendGetStatus(server);
 			return;
 		}
@@ -1210,7 +1217,7 @@ void HandleMessage(const char *msg, const struct sockaddr_in *address)
 			server->gsPort = ntohs(server->address.sin_port) - (u_short)10;
 
 		server->timeout = crt_time + TIMEOUT_HEARTBEAT;
-		MsgPrint(MSG_DEBUG, "%s ---> @%lld YYYYping\n", peer_address, crt_time);
+		MsgPrint(MSG_DEBUG, "%s ---> @%lld 'YYYYping' \n", peer_address, crt_time);
 		if (!server->protocol){
 			server->timeout = crt_time + TIMEOUT_INFORESPONSE;
 			SendGetStatus(server);
