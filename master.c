@@ -116,10 +116,6 @@ msg_level_t     max_msg_level = MSG_NORMAL;
 // Peer address. We rebuild it every time we receive a new packet
 char            peer_address[128];
 
-//clients. for bans
-clientTemp_t client;
-clientIpCheck_t cli_info[IP_CYCLE_LIST_COUNT];
-
 
 // ---------- Private functions ---------- //
 
@@ -182,7 +178,9 @@ Close TCP Socket with client flood
 */
 static qboolean FloodIpStoreReject( struct sockaddr_in *address )
 {
-	int i, j;
+	static int i, j;
+	static clientTemp_t client;
+	static clientIpCheck_t cli_info[IP_CYCLE_LIST_COUNT];
 
 	i = client.currentNum;
 	j = 0;
@@ -192,17 +190,18 @@ static qboolean FloodIpStoreReject( struct sockaddr_in *address )
 		if ( !(cli_info[i].from == NULL) && 
 			cli_info[i].from->sin_addr.s_addr == address->sin_addr.s_addr)
 		{
-			if (cli_info[i].lastPingTime  < crt_time)	{
+			if (cli_info[i].lastPingTime < crt_time)	{
 				cli_info[i].lastPingTime = crt_time;
 				cli_info[i].count = 0;
 			}
 
-			if (cli_info[i].count > 5)	{
+			if (cli_info[i].count > 6)	{
 				cli_info[i].lastPingTime = crt_time + 3;
+
 				return qtrue; //flood. ignore
 			}
 
-			cli_info[i].lastPingTime += 2;
+			cli_info[i].lastPingTime += 1;
 			cli_info[i].count++;
 			return qfalse; //return servers
 		}
@@ -750,10 +749,13 @@ static qboolean parseIgnoreAddress(void) //hypov8 will allways load file when a 
 	int             numAllocIgnoreAddresses = 1;
 	FILE           *f = NULL;
 	int             i;
-	qboolean			skipLine;
+	qboolean		skipLine;
+	time_t			timediff;
+
+	timediff = crt_time - lastParseTime;
 
 	// Only reparse periodically
-	if(crt_time - lastParseTime < PARSE_INTERVAL)
+	if (timediff < PARSE_INTERVAL)
 		return qtrue;
 
 	lastParseTime = time(NULL);
@@ -1184,7 +1186,9 @@ int main(int argc, const char *argv[])
 			}
 
 			if (FloodIpStoreReject(&address))	{
-				printf("%s:%hu ---> FLOOD: Client Rejected\n", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
+				char tmp[21];
+				sprintf(tmp, "%s:%hu", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
+				printf("%-21s ---> FLOOD: Client Rejected\n", tmp );
 				SocketError_close(tmpClientOut_tcp);
 				continue;
 			}
@@ -1206,6 +1210,7 @@ int main(int argc, const char *argv[])
 			}
 
 			iSendResult = send(tmpClientOut_tcp, 0, 0, 0);
+
 			/* check if we have recieved usable data */
 			if (IsGameSpyPacket(packet)) //if //gamename//gspylite// and NOT //list//
 				nb_bytes = recv(tmpClientOut_tcp, packet, MAX_PACKET_SIZE, 0);
@@ -1217,9 +1222,10 @@ int main(int argc, const char *argv[])
 		if(nb_bytes <= 0) //hypov8 note, error from sending ping after a shutdown. remove??
 		{
 			server_t       *server;
+			char tmp[21];
 
-			MsgPrint(MSG_DEBUG, "%s:%hu ---> @%lld returned %d bytes ( shutdown )\n",
-				inet_ntoa(address.sin_addr), ntohs(address.sin_port), crt_time, nb_bytes);
+			sprintf(tmp, "%s:%hu", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
+			MsgPrint(MSG_DEBUG, "%-21s ---> @%lld returned %d bytes ( shutdown )\n", tmp, crt_time, nb_bytes);
 
 			server = Sv_GetByAddr(&address, qfalse);
 			if (server == NULL)
@@ -1241,7 +1247,7 @@ int main(int argc, const char *argv[])
 		// We print the packet contents if necessary
 		if(max_msg_level >= MSG_DEBUG)
 		{
-			MsgPrint(MSG_DEBUG, "%s ---> @%lld New packet received\n", peer_address, crt_time);
+			MsgPrint(MSG_DEBUG, "%-21s ---> %-22s @%lld \n", peer_address, "New packet received", crt_time);
 			MsgPrint(MSG_DEBUG, "=================================================\n", peer_address);
 			PrintPacket(packet, nb_bytes);
 			MsgPrint(MSG_DEBUG, "=================================================\n\n", peer_address);
@@ -1264,7 +1270,7 @@ int main(int argc, const char *argv[])
 		//Handle Message(tcp);
 		if (isTCP) //TCP GameSpy listen
 		{
-			/* hypov8 packet sent in strange format, replace '\0' with \*/
+			/* hypov8 packet sent in strange format, replace '\0' with '\\' */
 			if (packet[0] == '\0' && nb_bytes)
 				replaceNullChar(packet, nb_bytes);
 

@@ -84,10 +84,17 @@ Remove a server from the list and returns its "next" pointer
 */
 static server_t *Sv_RemoveAndGetNextPtr(server_t * sv, server_t ** prev)
 {
+	static char ip[21];
+	static char time[21];
+	int timeout;
+
+	timeout = (int)(crt_time - sv->timeout);
+
 	nb_servers--;
-	MsgPrint(MSG_NORMAL,
-			 "%s:%hu ----  timed out ( %u servers registered )\n",
-			 inet_ntoa(sv->address.sin_addr), ntohs(sv->address.sin_port), nb_servers);
+	sprintf(ip, "%s:%hu", inet_ntoa(sv->address.sin_addr), ntohs(sv->address.sin_port));
+	sprintf(time, "%d", timeout);
+
+	MsgPrint(MSG_WARNING, "%-21s ---- Timeout sec:%05s      Stored (total: %u) \n",ip, time, nb_servers); // hash
 
 	// Mark this structure as "free"
 	sv->active = qfalse;
@@ -145,7 +152,7 @@ static qboolean Sv_ResolveAddr(const char *name, struct sockaddr_in *addr)
 	if(port != NULL)
 		addr->sin_port = htons((unsigned short)atoi(port));
 
-	MsgPrint(MSG_DEBUG, "\"%s\" resolved to %s:%hu\n", name, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
+	MsgPrint(MSG_DEBUG, "%-21s resolved to %s:%hu\n", name, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
 
 	free(namecpy);
 	return qtrue;
@@ -191,7 +198,7 @@ static void Sv_InsertAddrmapIntoList(addrmap_t * new_map)
 	new_map->next = *prev;
 	*prev = new_map;
 
-	MsgPrint(MSG_NORMAL, "Address \"%s\" mapped to \"%s\" (%s:%hu)\n",
+	MsgPrint(MSG_NORMAL, "%-21s Mapped to \"%s\" (%s:%hu)\n",
 			 new_map->from_string, new_map->to_string, inet_ntoa(new_map->to.sin_addr), ntohs(new_map->to.sin_port));
 }
 
@@ -399,6 +406,7 @@ server_t       *Sv_GetByAddr(const struct sockaddr_in *address, qboolean add_it)
 	unsigned int    hash;
 	const addrmap_t *addrmap = Sv_GetAddrmap(address);
 	unsigned int    startpt;
+	char			tmp[21];
 
 	// Allow servers on a loopback address ONLY if a mapping is defined for them
 	if((ntohl(address->sin_addr.s_addr) >> 24) == 127 && addrmap == NULL)
@@ -417,7 +425,7 @@ server_t       *Sv_GetByAddr(const struct sockaddr_in *address, qboolean add_it)
 		if(sv->timeout < crt_time)
 		{
 													//hypo long long int
-			MsgPrint(MSG_WARNING, "%s ---- timeout STORED:%lld TIME:%lld\n", peer_address, sv->timeout, crt_time); // hash
+			//MsgPrint(MSG_WARNING, "%-21s ---- Timeout STORED:%lld TIME:%lld\n", peer_address, sv->timeout, crt_time); // hash
 			sv = Sv_RemoveAndGetNextPtr(sv, prev);
 			continue;
 		}
@@ -427,7 +435,8 @@ server_t       *Sv_GetByAddr(const struct sockaddr_in *address, qboolean add_it)
 		{
 			// Put it on top of the list (it's useful because heartbeats
 			// are almost always followed by infoResponses)
-			MsgPrint(MSG_DEBUG, "%s:%hu ---- Existing server in database\n",/*peer_address*/ inet_ntoa(sv->address.sin_addr), ntohs(sv->address.sin_port));
+			sprintf(tmp, "%s:%hu", inet_ntoa(sv->address.sin_addr), ntohs(sv->address.sin_port));
+			MsgPrint(MSG_DEBUG, "%-21s ---- Existing server \n", tmp);
 
 			*prev = sv->next;
 			sv->next = hash_table[hash];
@@ -469,7 +478,7 @@ server_t       *Sv_GetByAddr(const struct sockaddr_in *address, qboolean add_it)
 	hash_table[hash] = sv;
 	nb_servers++;
 
-	MsgPrint(MSG_NORMAL, "%s ---+ New server added ( %u server registered )\n", peer_address, nb_servers);
+	MsgPrint(MSG_NORMAL, "%-21s ---+ %-22s Stored (total: %u)\n", peer_address, "New server", nb_servers);
 	MsgPrint(MSG_DEBUG, "  - index: %u\n" "  - hash: 0x%02X\n", last_alloc, hash);
 
 	return sv;
