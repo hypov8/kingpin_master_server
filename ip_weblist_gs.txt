@@ -1,0 +1,8 @@
+//websites list to get ip's from a text file
+//MAX is 3 addresses
+//Dont use http://
+//Gamespy Port listings. -10 game port (31500)
+//
+//www.qtracker.com/server_list_details.php?game=kingpin
+//forum.hambloch.com/kingpin/servers_active.php
+//

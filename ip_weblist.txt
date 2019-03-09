@@ -1,0 +1,7 @@
+//websites list to get ip's from a text file
+//MAX is 3 addresses
+//Dont use http://
+//Game Port listings (31510)
+//
+//forum.hambloch.com/kingpin/servers_active.php?gameport=1
+//
