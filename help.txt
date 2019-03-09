@@ -47,3 +47,4 @@ kingpin servers
 ====================
 when running master on same pc as the servers, you need to setmaster to the lan ip address.
 wan ip will return the ip of the router and make ip conversion invalid.
+use ip_rename.txt or -m
