@@ -38,7 +38,7 @@
 // ---------- Constants ---------- //
 
 // Version of dpmaster
-#define VERSION "1.6.04" //hypo
+#define VERSION "1.6.05" //hypo
 
 // Default master port
 #define DEFAULT_MASTER_PORT 27900 //27900 hypo kingpin

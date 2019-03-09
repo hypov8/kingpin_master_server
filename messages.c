@@ -158,19 +158,20 @@ static void SendGetStatus_Gamespy(const struct sockaddr_in *ServerAddress)
 
 	//gs port
 #ifdef USE_ALT_OUTPORT
-	if (sendto(outSock, msg, strlen(msg), 0, (const struct sockaddr *)ServerAddress, sizeof(*ServerAddress)))
+	if (sendto(outSock, msg, strlen(msg), 0, (const struct sockaddr *)ServerAddress, sizeof(*ServerAddress)) >= 0)
 #else
-	if (sendto(inSock_udp, msg, strlen(msg), 0, (const struct sockaddr *)ServerAddress, sizeof(*ServerAddress)))
+	if (sendto(inSock_udp, msg, strlen(msg), 0, (const struct sockaddr *)ServerAddress, sizeof(*ServerAddress)) >= 0)
 #endif
 	{
 		//	sprintf(tmp, "%s:%hu",inet_ntoa(ServerAddress->sin_addr), ntohs(ServerAddress->sin_port));
 		snprintf(tmpIP, sizeof(tmpIP), "%s:%hu", inet_ntoa(ServerAddress->sin_addr), ntohs(ServerAddress->sin_port));
 		MsgPrint(MSG_DEBUG, "%-21s <--- %-22s Sent (GameSpy Port) \n", tmpIP, "'\\\\status\\\\'");
 	}
-
-	netfail = ERRORNUM;
-	if (netfail)
+	else
+	{
+		netfail = ERRORNUM;
 		MsgPrint(MSG_WARNING, "%-21s <--- %-22s --== Socket Error ==-- \"%i\"\n", peer_address, "'\\\\status\\\\'", netfail);
+	}
 }
 
 /*
@@ -194,15 +195,18 @@ static void SendGetStatus(server_t * server)
 #endif
 	strncat(msg, server->challenge, sizeof(msg) - strlen(msg) - 1);
 #ifdef USE_ALT_OUTPORT
-	if (sendto(outSock, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)))
+	if (sendto(outSock, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)) >= 0)
 #else
-	if (sendto(inSock_udp, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)))
+	if (sendto(inSock_udp, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)) >= 0)
 #endif
+	{
 		MsgPrint(MSG_DEBUG, "%-21s <--- %-22s Sent (Game Port) \n", peer_address, "'YYYYstatus'");
-
-	netfail = ERRORNUM;
-	if (netfail)
+	}
+	else
+	{
+		netfail = ERRORNUM;
 		MsgPrint(MSG_WARNING, "%-21s <--- %-22s --== Socket Error ==-- (%i) \n", peer_address, "'YYYYstatus'", netfail);
+	}
 }
 
 
@@ -226,9 +230,9 @@ static void SendGetInfoKPQ3(server_t * server)
 	strncat(msg, server->challenge, sizeof(msg) - strlen(msg) - 1);
 
 #ifdef USE_ALT_OUTPORT
-	if (sendto(outSock_kpq3, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)))
+	if (sendto(outSock_kpq3, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)) >= 0)
 #else
-	if (sendto(inSock_kpq3, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)))
+	if (sendto(inSock_kpq3, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)) >= 0)
 #endif
 	{
 		MsgPrint(MSG_DEBUG, "%-21s <--- %-22s challenge(%s) \n", peer_address, "'getinfo'", server->challenge);
@@ -243,15 +247,18 @@ static void SendPing(server_t * server)
 
 	strncat(msg, server->challenge, sizeof(msg) - strlen(msg) - 1);
 #ifdef USE_ALT_OUTPORT
-	if (sendto(outSock, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)))
+	if (sendto(outSock, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)) >= 0)
 #else
-	if (sendto(inSock_udp, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)))
+	if (sendto(inSock_udp, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)) >= 0)
 #endif
+	{
 		MsgPrint(MSG_DEBUG, "%-21s <--- %-22s Sent (Game Port) \n", peer_address, "'YYYYPing'");
-
-	netfail = ERRORNUM;
-	if (netfail)
+	}
+	else
+	{
+		netfail = ERRORNUM;
 		MsgPrint(MSG_WARNING, "%-21s <--- %-22s --== Socket Error ==-- (%i) \n", peer_address, "'YYYYPing'", netfail);
+	}
 }
 
 //kingpin
@@ -262,15 +269,18 @@ static void SendAck(server_t * server)
 
 	strncat(msg, server->challenge, sizeof(msg) - strlen(msg) - 1);
 #ifdef USE_ALT_OUTPORT
-	if (sendto(outSock, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)))
+	if (sendto(outSock, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)) >= 0)
 #else
-	if (sendto(inSock_udp, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)))
+	if (sendto(inSock_udp, msg, strlen(msg), 0, (struct sockaddr *)&server->address, sizeof(server->address)) >= 0)
 #endif
+	{
 		MsgPrint(MSG_DEBUG, "%-21s <--- %-22s Sent (Game Port) \n", peer_address, "'YYYYAck'");
-
-	netfail = ERRORNUM;
-	if (netfail)
+	}
+	else
+	{
+		netfail = ERRORNUM;
 		MsgPrint(MSG_DEBUG, "%-21s <--- %-22s --== Socket Error ==-- (%i) \n", peer_address, "'YYYYAck'", netfail);
+	}
 
 }
 
@@ -286,15 +296,18 @@ static void SendAckGS(server_t * server)
 	tmpServerAddress.sin_port = htons(server->gsPort);
 
 #ifdef USE_ALT_OUTPORT
-	if (sendto(outSock, msg, strlen(msg), 0, (struct sockaddr *)&tmpServerAddress, sizeof(tmpServerAddress)))
+	if (sendto(outSock, msg, strlen(msg), 0, (struct sockaddr *)&tmpServerAddress, sizeof(tmpServerAddress)) >= 0)
 #else
-	if (sendto(inSock_udp, msg, strlen(msg), 0, (struct sockaddr *)&tmpServerAddress, sizeof(tmpServerAddress)))
+	if (sendto(inSock_udp, msg, strlen(msg), 0, (struct sockaddr *)&tmpServerAddress, sizeof(tmpServerAddress)) >= 0)
 #endif
+	{
 		MsgPrint(MSG_DEBUG, "%-21s <--- %-22s Sent (GameSpy Port)\n", peer_address, "'\\\\Ack\\\\'");
-
-	netfail = ERRORNUM;
-	if (netfail)
+	}
+	else
+	{
+		netfail = ERRORNUM;
 		MsgPrint(MSG_DEBUG, "%-21s <--- %-22s --== Socket Error ==-- (%i) \n", peer_address, "'\\\\Ack\\\\'", netfail);
+	}
 
 }
 
