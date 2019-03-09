@@ -84,17 +84,18 @@ Remove a server from the list and returns its "next" pointer
 */
 static server_t *Sv_RemoveAndGetNextPtr(server_t * sv, server_t ** prev)
 {
-	static char ip[21];
+	static char tmpIP[128];
 	static char time[21];
 	int timeout;
 
 	timeout = (int)(crt_time - sv->timeout);
 
 	nb_servers--;
-	sprintf(ip, "%s:%hu", inet_ntoa(sv->address.sin_addr), ntohs(sv->address.sin_port));
+	snprintf(tmpIP, sizeof(tmpIP), "%s:%hu", inet_ntoa(sv->address.sin_addr), ntohs(sv->address.sin_port));
+	//sprintf(ip, "%s:%hu", inet_ntoa(sv->address.sin_addr), ntohs(sv->address.sin_port));
 	sprintf(time, "%d", timeout);
 
-	MsgPrint(MSG_WARNING, "%-21s ---- Timeout sec:%05s      Stored (total: %u) \n",ip, time, nb_servers); // hash
+	MsgPrint(MSG_WARNING, "%-21s ---- Timeout sec:%05s      Stored (total: %u) \n",tmpIP, time, nb_servers); // hash
 
 	// Mark this structure as "free"
 	sv->active = qfalse;
@@ -112,7 +113,7 @@ Resolve an internet address
 name may include a port number, after a ':'
 ====================
 */
-static qboolean Sv_ResolveAddr(const char *name, struct sockaddr_in *addr)
+qboolean Sv_ResolveAddr(const char *name, struct sockaddr_in *addr)//hypo was static
 {
 	char           *namecpy, *port;
 	struct hostent *host;
@@ -198,7 +199,7 @@ static void Sv_InsertAddrmapIntoList(addrmap_t * new_map)
 	new_map->next = *prev;
 	*prev = new_map;
 
-	MsgPrint(MSG_NORMAL, "%-21s Mapped to \"%s\" (%s:%hu)\n",
+	MsgPrint(MSG_DEBUG, "%-21s Mapped to \"%s\" (%s:%hu)\n",
 			 new_map->from_string, new_map->to_string, inet_ntoa(new_map->to.sin_addr), ntohs(new_map->to.sin_port));
 }
 
@@ -395,6 +396,168 @@ qboolean Sv_Init(void)
 
 /*
 ====================
+Sv_PingTimeOut
+
+Search for a particular server in the list; add it if necessary
+====================
+*/
+void Sv_PingTimeOut_GamePort(void)
+{
+	//char            packet[sizeof(M2S_GETSTATUS_YYYY)] = M2S_GETSTATUS_YYYY;
+	char            packet[sizeof(M2S_PING_YYYY)] = M2S_PING_YYYY;
+	char            packet_kpq3[sizeof(M2S_GETINFO_KPQ3)] = M2S_GETINFO_KPQ3;
+	server_t		*sv;
+	unsigned long	sv_addr;
+	char			*char_sv_addr;
+	unsigned short  sv_port;
+
+	// ping every relevant server
+	for (sv = Sv_GetFirst(); /* see below */; sv = Sv_GetNext())
+	{
+		// No more next server
+		if (sv == NULL)
+			return;
+		// server is safe. more than 60 sec to timeout
+		if (sv->timeout > (crt_time + 60))
+			continue;
+		//server waiting for previous responce
+		if (sv->isWaitResponce)
+			continue;
+
+		char_sv_addr = inet_ntoa(sv->address.sin_addr);
+		sv_port = ntohs(sv->address.sin_port);
+		sv_addr = ntohl(sv->address.sin_addr.s_addr);
+
+		if (sv->protocol == 32 || sv->protocol == 34)
+#ifdef USE_ALT_OUTPORT
+			sendto(outSock, packet, strlen(packet), 0, (const struct sockaddr *)&sv->address, sizeof(sv->address));
+#else
+			sendto(inSock_udp, packet, strlen(packet), 0, (const struct sockaddr *)&sv->address, sizeof(sv->address));
+#endif
+		else if ((sv->protocol == 74 || sv->protocol == 75))
+#ifdef USE_ALT_OUTPORT
+			sendto(inSock_kpq3, packet_kpq3, strlen(packet), 0, (const struct sockaddr *)&sv->address, sizeof(sv->address));
+#else
+			sendto(inSock_kpq3, packet_kpq3, strlen(packet), 0, (const struct sockaddr *)&sv->address, sizeof(sv->address));
+#endif
+		else
+			continue;
+
+		// Extra debugging info
+		MsgPrint(MSG_DEBUG,
+			"About to timeout, ping serve: IP:\"%u.%u.%u.%u:%hu\", proto:%u\n",
+			(int)(sv_addr >> 24), ((sv_addr >> 16) & 0xFF),
+			((sv_addr >> 8) & 0xFF), (sv_addr & 0xFF), sv_port, sv->protocol);
+	}
+}
+
+
+/*
+====================
+Sv_PingOfflineList
+
+Ping servers from a text file. non public servers
+====================
+*/
+void Sv_PingOfflineList(char *ip, char *port, qboolean isGSpy)
+{
+	char				packet[64];
+	struct sockaddr_in	tmpServerAddress;
+	server_t			*sv;
+	char tmpIP[128];
+	int nb_bytes;
+
+	memset(packet, 0, sizeof(packet));
+	if (isGSpy)
+		strcpy(packet, M2S_GETSTATUS_GS);
+	else
+		strcpy(packet, M2S_GETSTATUS_YYYY);
+
+
+	memset(&tmpServerAddress, 0, sizeof(tmpServerAddress));
+
+	if (!Sv_ResolveAddr(ip, &tmpServerAddress))
+		return;
+
+	tmpServerAddress.sin_port = htons((u_short)atoi(port));
+
+	if (!tmpServerAddress.sin_port){
+		
+		//sprintf(tmp, "%s:%s", ip, port);
+		snprintf(tmpIP, sizeof(tmpIP), "%s:%S", ip, port);
+		MsgPrint(MSG_WARNING, "%-21s ---> ERROR: Offline port\n", tmpIP);
+		return;
+	}
+
+	// 0.0.0.0 addresses are forbidden
+	if (tmpServerAddress.sin_addr.s_addr == 0 || tmpServerAddress.sin_addr.s_addr == 0)	{
+		//sprintf(tmpIP, "%s:%s", ip, port);
+
+		MsgPrint(MSG_WARNING, "%-21s ---> ERROR: Offline 0.0.0.0 is forbidden\n", tmpIP);
+		return;
+	}
+
+	// Do NOT allow mapping to loopback addresses
+	if ((ntohl(tmpServerAddress.sin_addr.s_addr) >> 24) == 127)	{
+		//sprintf(tmp, "%s:%s", ip, port);
+		snprintf(tmpIP, sizeof(tmpIP), "%s:%S", ip, port);
+		MsgPrint(MSG_WARNING, "%-21s ---> ERROR: Offline to loopback address is forbidden\n", tmpIP);
+		return;
+	}
+
+
+	// if server is in list. dont ping it again
+	for (sv = Sv_GetFirst(); /* see below */; sv = Sv_GetNext())
+	{
+		// No more next server
+		if (sv == NULL)
+			break;
+
+		//surver exists. exit
+		if (sv->address.sin_addr.s_addr == tmpServerAddress.sin_addr.s_addr) 
+		{
+			if (isGSpy)	
+			{	//server is good. skip
+				if (sv->address.sin_port == htons((u_short)atoi(port) + 10) && sv->timeout > (crt_time + TIMEOUT_HEARTBEAT * .5))
+				{
+					MsgPrint(MSG_DEBUG, "Existing Server. Skip\n");
+					return;
+				}
+			}
+			else	
+			{	//server is good. skip
+				if (sv->address.sin_port == tmpServerAddress.sin_port && sv->timeout > (crt_time + TIMEOUT_HEARTBEAT * .5))	
+				{
+					MsgPrint(MSG_DEBUG, "Existing Server. Skip\n");
+					return;
+				}
+			}
+		}
+	}
+
+
+	// ping offline servers not in master
+#ifdef USE_ALT_OUTPORT
+	nb_bytes = sendto(outSock, packet, strlen(packet), 0, (const struct sockaddr *)&tmpServerAddress, sizeof(tmpServerAddress));
+#else
+	nb_bytes= sendto(inSock_udp, packet, strlen(packet), 0, (const struct sockaddr *)&tmpServerAddress, sizeof(tmpServerAddress));
+	
+	if (nb_bytes == SOCKET_ERROR){
+		char tmpIP[128];
+		int netfail;
+
+		netfail = ERRORNUM;
+		snprintf(tmpIP, sizeof(tmpIP), "%s:%S", ip, port);
+		MsgPrint(MSG_WARNING, "%-21s ---> %-22s error:%i\n", tmpIP, "WARNING: 'sendto' web\n", netfail);
+
+	}
+
+#endif
+}
+
+
+/*
+====================
 Sv_GetByAddr
 
 Search for a particular server in the list; add it if necessary
@@ -406,12 +569,12 @@ server_t       *Sv_GetByAddr(const struct sockaddr_in *address, qboolean add_it)
 	unsigned int    hash;
 	const addrmap_t *addrmap = Sv_GetAddrmap(address);
 	unsigned int    startpt;
-	char			tmp[21];
+	char			tmpIP[128];
 
 	// Allow servers on a loopback address ONLY if a mapping is defined for them
 	if((ntohl(address->sin_addr.s_addr) >> 24) == 127 && addrmap == NULL)
 	{
-		MsgPrint(MSG_WARNING, "WARNING: server %s isn't allowed (loopback address)\n", peer_address);
+		MsgPrint(MSG_WARNING, "%-21s ---> WARNING: server %s isn't allowed (loopback address)\n",peer_address);
 		return NULL;
 	}
 
@@ -422,21 +585,17 @@ server_t       *Sv_GetByAddr(const struct sockaddr_in *address, qboolean add_it)
 	while(sv != NULL)
 	{
 		// We check the timeout values while browsing this list
-		if(sv->timeout < crt_time)
-		{
-													//hypo long long int
-			//MsgPrint(MSG_WARNING, "%-21s ---- Timeout STORED:%lld TIME:%lld\n", peer_address, sv->timeout, crt_time); // hash
+		if(sv->timeout < crt_time)		{
 			sv = Sv_RemoveAndGetNextPtr(sv, prev);
 			continue;
 		}
 
 		// Found!
-		if(sv->address.sin_addr.s_addr == address->sin_addr.s_addr && sv->address.sin_port == address->sin_port)
-		{
+		if(sv->address.sin_addr.s_addr == address->sin_addr.s_addr && sv->address.sin_port == address->sin_port)		{
 			// Put it on top of the list (it's useful because heartbeats
 			// are almost always followed by infoResponses)
-			sprintf(tmp, "%s:%hu", inet_ntoa(sv->address.sin_addr), ntohs(sv->address.sin_port));
-			MsgPrint(MSG_DEBUG, "%-21s ---- Existing server \n", tmp);
+			snprintf(tmpIP, sizeof(tmpIP), "%s:%hu", inet_ntoa(sv->address.sin_addr), ntohs(sv->address.sin_port));
+			MsgPrint(MSG_DEBUG, "%-21s ---- Existing server \n", tmpIP);
 
 			*prev = sv->next;
 			sv->next = hash_table[hash];
@@ -617,34 +776,41 @@ qboolean Sv_AddAddressMapping(const char *mapping)
 ====================
 Sv_ResolveAddressMappings
 
-Resolve the address mapping list
+Resolve the address mapping list 'ip_rename.txt'
 ====================
 */
 qboolean Sv_ResolveAddressMappings(void)
 {
-	addrmap_t      *unresolved = addrmaps;
-	addrmap_t      *addrmap;
-	qboolean        succeeded = qtrue;
-
+	//hypov8 alocate ip name conversion. Load .txt
 	addrmaps = NULL;
-
-	while(unresolved != NULL)
+	if (parseIPConversionFile() )
 	{
-		// Remove it from the unresolved list
-		addrmap = unresolved;
-		unresolved = unresolved->next;
+		addrmap_t      *unresolved = addrmaps;
+		addrmap_t      *addrmap;
+		qboolean        succeeded = qtrue;
 
-		// Continue the resolution, even if there's an error
-		if(!Sv_ResolveAddrmap(addrmap))
+		addrmaps = NULL;
+
+		while (unresolved != NULL)
 		{
-			free(addrmap->from_string);
-			free(addrmap->to_string);
-			free(addrmap);
-			succeeded = qfalse;
+			// Remove it from the unresolved list
+			addrmap = unresolved;
+			unresolved = unresolved->next;
+
+			// Continue the resolution, even if there's an error
+			if (!Sv_ResolveAddrmap(addrmap))
+			{
+				free(addrmap->from_string);
+				free(addrmap->to_string);
+				free(addrmap);
+				succeeded = qfalse;
+			}
+			else
+				Sv_InsertAddrmapIntoList(addrmap);
 		}
-		else
-			Sv_InsertAddrmapIntoList(addrmap);
+
+		return succeeded;
 	}
 
-	return succeeded;
+	return qfalse;
 }

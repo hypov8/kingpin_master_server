@@ -1,3 +1,7 @@
 //rename. used for local ip's
+//
+// <local ip> = <dns name>
+//
 192.168.1.124=kp.servegame.com
 192.168.1.123=hypo.hambloch.com
+//192.168.1.123=master0.kingpin.info

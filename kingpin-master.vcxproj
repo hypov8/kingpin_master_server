@@ -158,7 +158,10 @@
     <PreBuildEvent>
       <Command>xcopy /y /d "$(SolutionDir)help.txt" "$(OutDir)"
 xcopy /y /d "$(SolutionDir)ip_ignore.txt" "$(OutDir)"
-xcopy /y /d "$(SolutionDir)ip_rename.txt" "$(OutDir)"</Command>
+xcopy /y /d "$(SolutionDir)ip_rename.txt" "$(OutDir)"
+xcopy /y /d "$(SolutionDir)ip_offline.txt" "$(OutDir)"
+xcopy /y /d "$(SolutionDir)ip_weblist.txt" "$(OutDir)"
+xcopy /y /d "$(SolutionDir)ip_weblist_gs.txt" "$(OutDir)"</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='release_fix1|Win32'">
@@ -190,6 +193,14 @@ xcopy /y /d "$(SolutionDir)ip_rename.txt" "$(OutDir)"</Command>
       <EntryPointSymbol>mainCRTStartup</EntryPointSymbol>
       <TargetMachine>MachineX86</TargetMachine>
     </Link>
+    <PreBuildEvent>
+      <Command>xcopy /y /d "$(SolutionDir)help.txt" "$(OutDir)"
+xcopy /y /d "$(SolutionDir)ip_ignore.txt" "$(OutDir)"
+xcopy /y /d "$(SolutionDir)ip_rename.txt" "$(OutDir)"
+xcopy /y /d "$(SolutionDir)ip_offline.txt" "$(OutDir)"
+xcopy /y /d "$(SolutionDir)ip_weblist.txt" "$(OutDir)"
+xcopy /y /d "$(SolutionDir)ip_weblist_gs.txt" "$(OutDir)"</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -283,12 +294,15 @@ xcopy /y /d "$(SolutionDir)ip_rename.txt" "$(OutDir)"</Command>
       <MapExports>false</MapExports>
       <AssemblyDebug>true</AssemblyDebug>
       <ProfileGuidedDatabase>$(IntDir)$(TargetName).pgd</ProfileGuidedDatabase>
-      <ProgramDatabaseFile>$(OutDir)$(TargetName).pdb</ProgramDatabaseFile>
+      <ProgramDatabaseFile>$(OutDir)\obj\$(TargetName).pdb</ProgramDatabaseFile>
     </Link>
     <PreBuildEvent>
       <Command>xcopy /y /d "$(SolutionDir)help.txt" "$(OutDir)"
 xcopy /y /d "$(SolutionDir)ip_ignore.txt" "$(OutDir)"
-xcopy /y /d "$(SolutionDir)ip_rename.txt" "$(OutDir)"</Command>
+xcopy /y /d "$(SolutionDir)ip_rename.txt" "$(OutDir)"
+xcopy /y /d "$(SolutionDir)ip_offline.txt" "$(OutDir)"
+xcopy /y /d "$(SolutionDir)ip_weblist.txt" "$(OutDir)"
+xcopy /y /d "$(SolutionDir)ip_weblist_gs.txt" "$(OutDir)"</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -322,7 +336,10 @@ xcopy /y /d "$(SolutionDir)ip_rename.txt" "$(OutDir)"</Command>
   <ItemGroup>
     <ClInclude Include="common.h" />
     <ClInclude Include="messages.h" />
-    <ClInclude Include="resource.h" />
+    <ClInclude Include="resource.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="servers.h" />
   </ItemGroup>
   <ItemGroup>

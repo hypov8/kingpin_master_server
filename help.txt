@@ -34,6 +34,13 @@ command line options
 -s Static ip address. Only use if master ip is not dynamic. 
 	will not recheck ip conversion for dns in ip_rename.txt
 
+--== linux only ==--
+-D run as a daemon\n"
+-j <jail_path>   : use <jail_path> as chroot path (default: %s)\n"
+                   only available when running with super-user privileges\n"
+-u <user>        : use <user> privileges (default: %s)\n"
+                   only available when running with super-user privileges\n"
+
 
 ====================
 kingpin servers
