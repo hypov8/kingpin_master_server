@@ -38,7 +38,7 @@
 // ---------- Constants ---------- //
 
 // Version of dpmaster
-#define VERSION "1.6.05" //hypo
+#define VERSION "1.6.06" //hypo
 
 // Default master port
 #define DEFAULT_MASTER_PORT 27900 //27900 hypo kingpin
@@ -727,7 +727,7 @@ static qboolean SecureInit(void)
 		SocketError_close(inSock_tcp, 0);
 		return qfalse;
 	}
-	MsgPrint(MSG_NORMAL, "Listening   TCP port %hu -=(  gamespy  )=- \n", ntohs(address.sin_port));
+	MsgPrint(MSG_NORMAL, "Listening   TCP port %hu -=(  Gamespy  )=- \n", ntohs(address.sin_port));
 
 	if (listen(inSock_tcp, 10) == SOCKET_ERROR) {//hypo todo: test. is 10 enough?
 		MsgPrint(MSG_ERROR, "listen(): Error listening on socket (%s). \n", strerror(errno));

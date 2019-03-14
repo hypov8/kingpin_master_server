@@ -574,7 +574,7 @@ server_t       *Sv_GetByAddr(const struct sockaddr_in *address, qboolean add_it)
 	// Allow servers on a loopback address ONLY if a mapping is defined for them
 	if((ntohl(address->sin_addr.s_addr) >> 24) == 127 && addrmap == NULL)
 	{
-		MsgPrint(MSG_WARNING, "%-21s ---> WARNING: server %s isn't allowed (loopback address)\n",peer_address);
+		MsgPrint(MSG_WARNING, "%-21s ---> WARNING: server isn't allowed (loopback address)\n",peer_address);
 		return NULL;
 	}
 
