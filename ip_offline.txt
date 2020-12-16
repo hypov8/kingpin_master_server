@@ -1,4 +1,4 @@
-//offline servers to ping. non dedicated etc..
+// offline servers to ping. non dedicated, wrong master etc..
 //
 //121.210.38.89:31510
 //kp.servegame.com:31510

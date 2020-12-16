@@ -67,7 +67,7 @@ typedef struct server_s
 	time_t          timeout;
 	time_t          challenge_timeout;
 	char gamename[64];
-	const struct addrmap_s *addrmap;
+	const struct addrmap_s *addressReMap;
 	qboolean        active;
 	time_t          lastGameStat;
 } server_t;
@@ -87,7 +87,7 @@ typedef struct clientIpCheck_s
 	//char           *to_string;
 } clientIpCheck_t;
 
-typedef struct clientTmp_s
+typedef struct clientTemp_s
 {
 	//clientIpCheck_t info[IP_CYCLE_LIST_COUNT];
 
@@ -126,7 +126,7 @@ server_t       *Sv_GetNext(void);
 
 // Add an unresolved address mapping to the list
 // mapping must be of the form "addr1:port1=addr2:port2", ":portX" are optional
-qboolean        Sv_AddAddressMapping(const char *mapping);
+qboolean        Sv_Add_unResolvedAddressMapping(const char *mapping);
 
 // Resolve the address mapping list
 qboolean        Sv_ResolveAddressMappings(void);

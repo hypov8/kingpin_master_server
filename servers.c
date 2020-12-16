@@ -52,7 +52,7 @@ static server_t **prev_pointer = NULL;
 static int      crt_hash_ind = -1;
 
 // List of address mappings. They are sorted by "from" field (IP, then port)
-static addrmap_t *addrmaps = NULL;
+static addrmap_t *sv_addrmaps = NULL;
 
 
 // ---------- Private functions ---------- //
@@ -84,18 +84,20 @@ Remove a server from the list and returns its "next" pointer
 */
 static server_t *Sv_RemoveAndGetNextPtr(server_t * sv, server_t ** prev)
 {
-	static char tmpIP[128];
-	static char time[21];
+	char tmpIP[128];
+	char time[21];
 	int timeout;
 
 	timeout = (int)(crt_time - sv->timeout);
 
 	nb_servers--;
-	snprintf(tmpIP, sizeof(tmpIP), "%s:%hu", inet_ntoa(sv->address.sin_addr), ntohs(sv->address.sin_port));
-	//sprintf(ip, "%s:%hu", inet_ntoa(sv->address.sin_addr), ntohs(sv->address.sin_port));
+	snprintf(tmpIP, sizeof(tmpIP), "%s:%hu",
+		inet_ntoa(sv->address.sin_addr), ntohs(sv->address.sin_port));
+
 	sprintf(time, "%d", timeout);
 
-	MsgPrint(MSG_WARNING, "%-21s ---- Timeout sec:%05s      Stored (total: %u) \n",tmpIP, time, nb_servers); // hash
+	MsgPrint(MSG_WARNING, "%-21s ---- Timeout sec:%05s      Stored (total: %u) \n",
+		tmpIP, time, nb_servers); // hash
 
 	// Mark this structure as "free"
 	sv->active = qfalse;
@@ -150,10 +152,17 @@ qboolean Sv_ResolveAddr(const char *name, struct sockaddr_in *addr)//hypo was st
 	memset(addr, 0, sizeof(*addr));
 	addr->sin_family = AF_INET;
 	memcpy(&addr->sin_addr.s_addr, host->h_addr, sizeof(addr->sin_addr.s_addr));
-	if(port != NULL)
-		addr->sin_port = htons((unsigned short)atoi(port));
-
-	MsgPrint(MSG_DEBUG, "%-21s resolved to %s:%hu\n", name, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
+	if ( port != NULL )
+	{
+		addr->sin_port = htons(( unsigned short ) atoi(port));
+		MsgPrint(MSG_DEBUG, "%-21s DNS resolved to %s:%hu\n",
+			name, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
+	}
+	else
+	{
+		MsgPrint(MSG_DEBUG, "%-21s DNS resolved to %s\n",
+			name, inet_ntoa(addr->sin_addr));
+	}
 
 	free(namecpy);
 	return qtrue;
@@ -169,14 +178,15 @@ Insert an addrmap structure to the addrmaps list
 */
 static void Sv_InsertAddrmapIntoList(addrmap_t * new_map)
 {
-	addrmap_t      *addrmap = addrmaps;
-	addrmap_t     **prev = &addrmaps;
+	addrmap_t      *addrmap = sv_addrmaps;
+	addrmap_t     **prev = &sv_addrmaps;
 
 	// Stop at the end of the list, or if the addresses become too high
 	while(addrmap != NULL && addrmap->from.sin_addr.s_addr <= new_map->from.sin_addr.s_addr)
 	{
 		// If we found the right place
-		if(addrmap->from.sin_addr.s_addr == new_map->from.sin_addr.s_addr && addrmap->from.sin_port >= new_map->from.sin_port)
+		if(addrmap->from.sin_addr.s_addr == new_map->from.sin_addr.s_addr &&
+			addrmap->from.sin_port >= new_map->from.sin_port)
 		{
 			// If a mapping is already recorded for this address
 			if(addrmap->from.sin_port == new_map->from.sin_port)
@@ -200,7 +210,8 @@ static void Sv_InsertAddrmapIntoList(addrmap_t * new_map)
 	*prev = new_map;
 
 	MsgPrint(MSG_DEBUG, "%-21s Mapped to \"%s\" (%s:%hu)\n",
-			 new_map->from_string, new_map->to_string, inet_ntoa(new_map->to.sin_addr), ntohs(new_map->to.sin_port));
+			 new_map->from_string, new_map->to_string,
+			 inet_ntoa(new_map->to.sin_addr), ntohs(new_map->to.sin_port));
 }
 
 
@@ -213,7 +224,7 @@ Look for an address mapping corresponding to addr
 */
 static const addrmap_t *Sv_GetAddrmap(const struct sockaddr_in *addr)
 {
-	const addrmap_t *addrmap = addrmaps;
+	const addrmap_t *addrmap = sv_addrmaps;
 	const addrmap_t *found = NULL;
 
 	// Stop at the end of the list, or if the addresses become too high
@@ -253,8 +264,14 @@ Resolve an addrmap structure and check the parameters validity
 static qboolean Sv_ResolveAddrmap(addrmap_t * addrmap)
 {
 	// Resolve the addresses
-	if(!Sv_ResolveAddr(addrmap->from_string, &addrmap->from) || !Sv_ResolveAddr(addrmap->to_string, &addrmap->to))
+	if (!Sv_ResolveAddr(addrmap->from_string, &addrmap->from) ||
+		!Sv_ResolveAddr(addrmap->to_string, &addrmap->to))
+	{ 
+		//add hypov8 display ip rename issues
+		MsgPrint(MSG_ERROR, "ERROR: Mapping from %s to %s not resolved\n",
+			addrmap->from_string, addrmap->to_string);
 		return qfalse;
+	}
 
 	// 0.0.0.0 addresses are forbidden
 	if(addrmap->from.sin_addr.s_addr == 0 || addrmap->to.sin_addr.s_addr == 0)
@@ -367,7 +384,7 @@ qboolean Sv_Init(void)
 	size_t          array_size;
 
 	// Allocate "servers" and clean it
-	array_size = max_nb_servers * sizeof(servers[0]);
+	array_size = max_nb_servers * sizeof(server_t);
 	servers = malloc(array_size);
 	if(!servers)
 	{
@@ -403,9 +420,6 @@ Search for a particular server in the list; add it if necessary
 */
 void Sv_PingTimeOut_GamePort(void)
 {
-	//char            packet[sizeof(M2S_GETSTATUS_YYYY)] = M2S_GETSTATUS_YYYY;
-	char            packet[sizeof(M2S_PING_YYYY)] = M2S_PING_YYYY;
-	char            packet_kpq3[sizeof(M2S_GETINFO_KPQ3)] = M2S_GETINFO_KPQ3;
 	server_t		*sv;
 	unsigned long	sv_addr;
 	char			*char_sv_addr;
@@ -428,18 +442,26 @@ void Sv_PingTimeOut_GamePort(void)
 		sv_port = ntohs(sv->address.sin_port);
 		sv_addr = ntohl(sv->address.sin_addr.s_addr);
 
-		if (sv->protocol == 32 || sv->protocol == 34)
+		if ( sv->protocol == 32 || sv->protocol == 34 )
+		{
 #ifdef USE_ALT_OUTPORT
-			sendto(outSock, packet, strlen(packet), 0, (const struct sockaddr *)&sv->address, sizeof(sv->address));
+			sendto(outSock_udp, M2S_PING_YYYY, strlen(M2S_PING_YYYY), 0,
+				(const struct sockaddr *)&sv->address, sizeof(sv->address));
 #else
-			sendto(inSock_udp, packet, strlen(packet), 0, (const struct sockaddr *)&sv->address, sizeof(sv->address));
+			sendto(inSock_udp, M2S_PING_YYYY, strlen(M2S_PING_YYYY), 0,
+				( const struct sockaddr * )&sv->address, sizeof(sv->address));
 #endif
-		else if ((sv->protocol == 74 || sv->protocol == 75))
+		}
+		else if ( ( sv->protocol == 74 || sv->protocol == 75 ) )
+		{
 #ifdef USE_ALT_OUTPORT
-			sendto(inSock_kpq3, packet_kpq3, strlen(packet), 0, (const struct sockaddr *)&sv->address, sizeof(sv->address));
+			sendto(outSock_kpq3, M2S_GETINFO_KPQ3, strlen(M2S_GETINFO_KPQ3), 0,
+				(const struct sockaddr *)&sv->address, sizeof(sv->address));
 #else
-			sendto(inSock_kpq3, packet_kpq3, strlen(packet), 0, (const struct sockaddr *)&sv->address, sizeof(sv->address));
+			sendto(inSock_kpq3, M2S_GETINFO_KPQ3, strlen(M2S_GETINFO_KPQ3), 0,
+				( const struct sockaddr * )&sv->address, sizeof(sv->address));
 #endif
+		}
 		else
 			continue;
 
@@ -491,9 +513,7 @@ void Sv_PingOfflineList(char *ip, char *port, qboolean isGSpy)
 
 	// 0.0.0.0 addresses are forbidden
 	if (tmpServerAddress.sin_addr.s_addr == 0 || tmpServerAddress.sin_addr.s_addr == 0)	{
-		//sprintf(tmpIP, "%s:%s", ip, port);
-
-		MsgPrint(MSG_WARNING, "%-21s ---> ERROR: Offline 0.0.0.0 is forbidden\n", tmpIP);
+		MsgPrint(MSG_WARNING, "%-21s ---> ERROR: Offline 0.0.0.0 is forbidden\n");
 		return;
 	}
 
@@ -509,7 +529,7 @@ void Sv_PingOfflineList(char *ip, char *port, qboolean isGSpy)
 	// if server is in list. dont ping it again
 	for (sv = Sv_GetFirst(); /* see below */; sv = Sv_GetNext())
 	{
-		// No more next server
+		// No more next server. so ping them
 		if (sv == NULL)
 			break;
 
@@ -518,17 +538,23 @@ void Sv_PingOfflineList(char *ip, char *port, qboolean isGSpy)
 		{
 			if (isGSpy)	
 			{	//server is good. skip
-				if (sv->address.sin_port == htons((u_short)atoi(port) + 10) && sv->timeout > (crt_time + TIMEOUT_HEARTBEAT * .5))
+				if (sv->address.sin_port == htons((u_short)atoi(port) + 10) &&
+					sv->timeout > (crt_time + TIMEOUT_HEARTBEAT * .5))
 				{
-					MsgPrint(MSG_DEBUG, "Existing Server. Skip\n");
+					snprintf(tmpIP, sizeof(tmpIP), "%s:%hu",
+						inet_ntoa(sv->address.sin_addr), ntohs(sv->address.sin_port));
+					MsgPrint(MSG_DEBUG, "%-21s ---- Existing server. skip \n", tmpIP);
 					return;
 				}
 			}
 			else	
 			{	//server is good. skip
-				if (sv->address.sin_port == tmpServerAddress.sin_port && sv->timeout > (crt_time + TIMEOUT_HEARTBEAT * .5))	
+				if (sv->address.sin_port == tmpServerAddress.sin_port &&
+					sv->timeout > (crt_time + TIMEOUT_HEARTBEAT * .5))	
 				{
-					MsgPrint(MSG_DEBUG, "Existing Server. Skip\n");
+					snprintf(tmpIP, sizeof(tmpIP), "%s:%hu",
+						inet_ntoa(sv->address.sin_addr), ntohs(sv->address.sin_port));
+					MsgPrint(MSG_DEBUG, "%-21s ---- Existing server. skip \n", tmpIP);
 					return;
 				}
 			}
@@ -538,18 +564,16 @@ void Sv_PingOfflineList(char *ip, char *port, qboolean isGSpy)
 
 	// ping offline servers not in master
 #ifdef USE_ALT_OUTPORT
-	nb_bytes = sendto(outSock, packet, strlen(packet), 0, (const struct sockaddr *)&tmpServerAddress, sizeof(tmpServerAddress));
+	nb_bytes = sendto(outSock_udp, packet, strlen(packet), 0,
+		(const struct sockaddr *)&tmpServerAddress, sizeof(tmpServerAddress));
 #else
-	nb_bytes= sendto(inSock_udp, packet, strlen(packet), 0, (const struct sockaddr *)&tmpServerAddress, sizeof(tmpServerAddress));
+	nb_bytes= sendto(inSock_udp, packet, strlen(packet), 0,
+		(const struct sockaddr *)&tmpServerAddress, sizeof(tmpServerAddress));
 	
 	if (nb_bytes == SOCKET_ERROR){
-		char tmpIP[128];
-		int netfail;
-
-		netfail = ERRORNUM;
 		snprintf(tmpIP, sizeof(tmpIP), "%s:%S", ip, port);
-		MsgPrint(MSG_WARNING, "%-21s ---> %-22s error:%i\n", tmpIP, "WARNING: 'sendto' web\n", netfail);
-
+		MsgPrint(MSG_WARNING, "%-21s ---> %-22s error:%i\n",
+			tmpIP, "WARNING: 'sendto' offlineList\n", ERRORNUM);
 	}
 
 #endif
@@ -567,7 +591,7 @@ server_t       *Sv_GetByAddr(const struct sockaddr_in *address, qboolean add_it)
 {
 	server_t      **prev, *sv;
 	unsigned int    hash;
-	const addrmap_t *addrmap = Sv_GetAddrmap(address);
+	const addrmap_t *addrmap = Sv_GetAddrmap(address); //addressReMap
 	unsigned int    startpt;
 	char			tmpIP[128];
 
@@ -591,10 +615,13 @@ server_t       *Sv_GetByAddr(const struct sockaddr_in *address, qboolean add_it)
 		}
 
 		// Found!
-		if(sv->address.sin_addr.s_addr == address->sin_addr.s_addr && sv->address.sin_port == address->sin_port)		{
+		if(sv->address.sin_addr.s_addr == address->sin_addr.s_addr &&
+			sv->address.sin_port == address->sin_port)
+		{
 			// Put it on top of the list (it's useful because heartbeats
 			// are almost always followed by infoResponses)
-			snprintf(tmpIP, sizeof(tmpIP), "%s:%hu", inet_ntoa(sv->address.sin_addr), ntohs(sv->address.sin_port));
+			snprintf(tmpIP, sizeof(tmpIP), "%s:%hu",
+				inet_ntoa(sv->address.sin_addr), ntohs(sv->address.sin_port));
 			MsgPrint(MSG_DEBUG, "%-21s ---- Existing server \n", tmpIP);
 
 			*prev = sv->next;
@@ -630,15 +657,17 @@ server_t       *Sv_GetByAddr(const struct sockaddr_in *address, qboolean add_it)
 	// Initialize the structure
 	memset(sv, 0, sizeof(*sv));
 	memcpy(&sv->address, address, sizeof(sv->address));
-	sv->addrmap = addrmap;
+	sv->addressReMap = addrmap;
 
 	// Add it to the list it belongs to
 	sv->next = hash_table[hash];
 	hash_table[hash] = sv;
 	nb_servers++;
 
-	MsgPrint(MSG_NORMAL, "%-21s ---+ %-22s Stored (total: %u)\n", peer_address, "New server", nb_servers);
-	MsgPrint(MSG_DEBUG, "  - index: %u\n" "  - hash: 0x%02X\n", last_alloc, hash);
+	MsgPrint(MSG_NORMAL, "%-21s ---+ %-22s Stored (total: %u)\n",
+		peer_address, "New server", nb_servers);
+	MsgPrint(MSG_DEBUG, "  - index: %u\n" "  - hash: 0x%02X\n",
+		last_alloc, hash);
 
 	return sv;
 }
@@ -714,16 +743,16 @@ server_t       *Sv_GetNext(void)
 
 /*
 ====================
-Sv_AddAddressMapping
+Sv_Add_unResolvedAddressMapping
 
 Add an unresolved address mapping to the list
 mapping must be of the form "addr1:port1=addr2:port2", ":portX" are optional
 ====================
 */
-qboolean Sv_AddAddressMapping(const char *mapping)
+qboolean Sv_Add_unResolvedAddressMapping(const char *mapping)
 {
 	char           *map_string, *to_ip;
-	addrmap_t      *addrmap;
+	addrmap_t      *addrmap, *tmp;
 
 	// Get a working copy of the mapping string
 	map_string = x_strdup(mapping);
@@ -743,6 +772,30 @@ qboolean Sv_AddAddressMapping(const char *mapping)
 	}
 	*to_ip++ = '\0';
 
+	//check for existing <from> and update <to>
+	tmp = sv_addrmaps;
+	while ( tmp != NULL )
+	{
+		//found existing server ip, update remap address. 
+		// note: server remap pointer is not updated at runtime
+		if ( !strcmp(tmp->from_string, map_string) )
+		{
+			//clear old ref and set new remap
+			free(tmp->to_string); //free old string
+			tmp->to_string = x_strdup(to_ip);
+			if(tmp->to_string == NULL)
+			{
+				MsgPrint(MSG_ERROR, "ERROR: can't allocate address mapping string.\n");
+				return qfalse;
+			}
+			free(map_string);
+			memset(&tmp->from, 0, sizeof(tmp->from));
+			memset(&tmp->to, 0, sizeof(tmp->to));
+			return qtrue;
+		}
+		tmp = tmp->next;
+	}
+
 	// Allocate the structure
 	addrmap = malloc(sizeof(*addrmap));
 	if(addrmap == NULL)
@@ -757,16 +810,20 @@ qboolean Sv_AddAddressMapping(const char *mapping)
 	if(addrmap->from_string == NULL || addrmap->to_string == NULL)
 	{
 		MsgPrint(MSG_ERROR, "ERROR: can't allocate address mapping strings\n");
-		free(addrmap->to_string);
-		free(addrmap->from_string);
+		if (addrmap->to_string== NULL)
+			free(addrmap->to_string);
+		if (addrmap->from_string == NULL)
+			free(addrmap->from_string);
 		free(addrmap);
 		free(map_string);
 		return qfalse;
 	}
 
 	// Add it on top of "addrmaps"
-	addrmap->next = addrmaps;
-	addrmaps = addrmap;
+	addrmap->next = sv_addrmaps;
+	sv_addrmaps = addrmap;
+
+	free(map_string);
 
 	return qtrue;
 }
@@ -782,14 +839,13 @@ Resolve the address mapping list 'ip_rename.txt'
 qboolean Sv_ResolveAddressMappings(void)
 {
 	//hypov8 alocate ip name conversion. Load .txt
-	addrmaps = NULL;
-	if (parseIPConversionFile() )
+	if (MAST_parseIPConversionFile() )
 	{
-		addrmap_t      *unresolved = addrmaps;
+		addrmap_t      *unresolved = sv_addrmaps;
 		addrmap_t      *addrmap;
 		qboolean        succeeded = qtrue;
 
-		addrmaps = NULL;
+		sv_addrmaps = NULL;
 
 		while (unresolved != NULL)
 		{

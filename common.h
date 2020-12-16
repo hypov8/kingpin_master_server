@@ -34,6 +34,7 @@
 
 #ifdef WIN32
 # include <winsock2.h>
+//# include <vld.h>
 #else
 # include <netinet/in.h>
 # include <arpa/inet.h>
@@ -68,47 +69,50 @@
 
 #define YYYY "\xFF\xFF\xFF\xFF" //ÿÿÿÿ
 
+//max tcp clients
+#define MAX_CLIENTS 8
+
 
 ////////////////
 //  kp stuff  //
 ////////////////
 
 // server to master
-#define S2M_HEARTBEAT			"\\heartbeat\\"			//heartbeat GS packet
-#define S2M_HEARTBEAT_YYYY		YYYY"heartbeat\n"		//heartbeat game port
-#define S2M_GAMENAME_KINGPIN	"\\gamename\\kingpin"	//gamename GS packet
-#define S2M_SHUTDOWN_YYYY		YYYY"shutdown"			//shutdown, server change, map etc
-#define S2M_ACK_YYYY			YYYY"ack"				//recieved ack 
-#define S2M_PING_YYYY			YYYY"ping"				//recieved ping (initilized server...)
-#define S2M_PRINT_YYYY			YYYY"print\n"			//recieved print (after sending status...)
-#define S2M_ERROR_STR			"Info string length exceeded\n" //fix strings to long. game port send limitation
-#define S2M_FINAL				"\\final\\\\queryid\\"			//kingpin.exe responce to ack packet
+#define S2M_HEARTBEAT				"\\heartbeat\\"			//heartbeat GS packet
+#define S2M_GAMENAME_KINGPIN		"\\gamename\\kingpin"	//gamename GS packet
+#define S2M_FINAL					"\\final\\\\queryid\\"			//kingpin.exe responce to ack packet
+#define S2M_HEARTBEAT_YYYY			YYYY"heartbeat\n"		//heartbeat game port
+#define S2M_SHUTDOWN_YYYY			YYYY"shutdown"			//shutdown, server change, map etc
+#define S2M_ACK_YYYY				YYYY"ack"				//recieved ack 
+#define S2M_PING_YYYY				YYYY"ping"				//recieved ping (initilized server...)
+#define S2M_PRINT_YYYY				YYYY"print\n"			//recieved print (after sending status...)
+#define S2M_ERROR_STR				"Info string length exceeded\n" //fix strings to long. game port send limitation
+
 
 // master to server
-#define M2S_GETSTATUS_GS	"\\status\\"	//send status GS packet
-#define M2S_GETSTATUS_YYYY	YYYY"status\n"	//send status game port
-#define M2S_PING_YYYY		YYYY"ping\n"	//send ping, hoping to recieve ack
-#define M2S_ACK_GS			"\\ack\\"		//reponde with an ack. Gamespy
-#define M2S_ACK_YYYY		YYYY"ack\n"		//reponde with an ack
+#define M2S_GETSTATUS_GS			"\\status\\"	//send status GS packet
+#define M2S_GETSINFO_GS				"\\info\\"		//send info GS packet //todo? there should be a short server string
+#define M2S_ACK_GS					"\\ack\\"		//reponde with an ack. Gamespy
+#define M2S_GETSTATUS_YYYY			YYYY"status\n"	//send status game port
+#define M2S_PING_YYYY				YYYY"ping\n"	//send ping, hoping to recieve ack
+#define M2S_ACK_YYYY				YYYY"ack\n"		//reponde with an ack
 
-//gamespy browser to master
-#define B2M_INITALCONTACT		"\\gamename\\gspylite\\" //inital contact
-#define B2M_GETSERVERS			"\\list\\" 
-#define B2M_GETSERVERS_GSLIST2	"\\gamename\\gamespy2\\"
-#define B2M_GETSERVERS_QUERY	"query"
-//#define B2M_GETSERVERS_GSLIST	"\\&\\\x1\x3\\\\\\\\kingpin\\gslive\\"
-//#define B2M_GETSERVERS_LIST "\\list\\\\gamename\\""
-//87.175.221.101:61916 --->invalid GameSpy(\gamename\gamespy2\gamever\20603020\enctype\0\validate\Up
-//kV3Mfn\final\\list\cmp\gamename\kps)
-// "\x00&\x00\x01\x03\x00\x00\x00\x00kingpin\x00gslive\""
+//gamebrowser to master
+#define B2M_GETSERVERS_LIST			"\\list\\"
+#define B2M_GETSERVERS_QUERY		YYYY"query" //udp //hypov8 added YYYY. check other q2 browsers are ok still
+
+//master to client. ingame browser
+#define M2C_GETSERVERSREPONSE_Q2	YYYY"servers\n" // "servers (6 bytes)(6 bytes)" //hypov8 add \n todo check q2 browsers
 
 //master to gamespy browser
-#define M2B_ECHOREPLY	"\\basic\\\\secure\\TXKOAT" //echo reply to gamespy
+#define M2B_KEY						"TXKOAT" //todo auto generate? //TXKOAT
+#define M2B_ECHOREPLY				"\\basic\\\\secure\\" M2B_KEY //echo reply to gamespy "\\basic\\\\secure\\TXKOAT"
 
-//motd
-#define C2M_GETMOTD "getmotd"
-#define M2C_MOTD    "motd "
+//client to master. ingame browser
+#define C2M_GETMOTD					"getmotd" //hypov8 note YYYY or \\getmotd\\?
 
+//master to client. ingame browser
+#define M2C_MOTD					"motd "
 
 
 ////////////////
@@ -116,32 +120,42 @@
 ////////////////
 
 //server to master
-#define S2M_HEARTBEAT_KPQ3		"heartbeat KingpinQ3-1" // "heartbeat Kingpinq3\n"
-#define S2M_HEARTBEAT_DP		"heartbeat DarkPlaces"	// more accepted protocol name at other masters
-#define S2M_INFORESPONSE_KPQ3	"infoResponse\x0A"		// "infoResponse\n\\pure\\1\\..."
-#define S2M_FLATLINE_KPQ3		"KingpinQ3-1"			//kill kpq3 server
-#define S2M_FLATLINE2_KPQ3		"DarkPlaces"			//kill kpq3 server
+#define S2M_HEARTBEAT_KPQ3			"heartbeat KingpinQ3-1" // "heartbeat Kingpinq3\n"
+#define S2M_HEARTBEAT_DP			"heartbeat DarkPlaces"	// more accepted protocol name at other masters
+#define S2M_INFORESPONSE_KPQ3		"infoResponse\x0A"		// "infoResponse\n\\pure\\1\\..."
+#define S2M_FLATLINE_KPQ3			"KingpinQ3-1"			//kill kpq3 server
+#define S2M_FLATLINE2_KPQ3			"DarkPlaces"			//kill kpq3 server
 
 //master to server
-#define M2S_GETINFO_KPQ3		YYYY"getinfo "				// "getinfo A_Challenge"
+#define M2S_GETINFO_KPQ3			YYYY"getinfo "				// "getinfo A_Challenge"
 //#define M2S_GETSTATUS_KPQ3		"ÿÿÿÿgetstatus "
 
 //client to master. ingame browser
-#define C2M_GETSERVERS_KPQ3		"getservers KingpinQ3-1"	// "getservers KingpinQ3-1 75 empty full"
-#define C2M_GETSERVERS2_KPQ3	"getservers "				// "getservers 68 empty full"	// not using darkplaces protocol
-#define C2M_GETMOTD_KPQ3		"getmotd"
+#define C2M_GETSERVERS_KPQ3			"getservers KingpinQ3-1"	// "getservers KingpinQ3-1 75 empty full"
+#define C2M_GETSERVERS2_KPQ3		"getservers "				// "getservers 68 empty full"	// not using darkplaces protocol
+#define C2M_GETMOTD_KPQ3			"getmotd"
 
 //master to client. ingame browser
 #define M2C_GETSERVERSREPONSE_KPQ3	YYYY"getserversResponse\\" // "getserversResponse\\...(6 bytes)...\\...(6 bytes)...\\EOT\0\0\0"
-#define M2C_GETSERVERSREPONSE_Q2	YYYY"servers " // "servers (6 bytes)(6 bytes)"
-
-#define M2C_CHALLENGE_KEY	"challenge\\"
-#define M2C_MOTD_KEY		"motd\\"
+#define M2C_CHALLENGE_KEY			"challenge\\"
+#define M2C_MOTD_KEY				"motd\\"
 
 
 
 
 // ---------- Types ---------- //
+//gamespy
+typedef unsigned char      uint8_t;
+typedef uint8_t     u8;
+
+typedef struct gamesList_s
+{
+	char*full_name;
+	char*short_name;
+	char*code_name;
+}gamesList_t;
+
+
 
 // A few basic types
 typedef enum
@@ -173,10 +187,10 @@ typedef SOCKET SOCKET_NET;
 typedef int SOCKET_NET;
 #endif
 
-extern SOCKET_NET	inSock_udp;
+extern SOCKET_NET		inSock_udp;
 extern SOCKET_NET		inSock_kpq3; //listen on kpq3 port
 #ifdef USE_ALT_OUTPORT
-extern SOCKET_NET		outSock;
+extern SOCKET_NET		outSock_udp;
 extern SOCKET_NET		outSock_kpq3; // out kpq3
 #endif
 extern SOCKET_NET		inSock_tcp;
@@ -222,6 +236,9 @@ extern char     peer_address[128];
 int             MsgPrint(msg_level_t msg_level, const char *format, ...);
 
 
-qboolean parseIPConversionFile(void);//add hypov8
+qboolean MAST_parseIPConversionFile(void);//add hypov8
+
+//gamespy
+int gslist_step_2(/*u8 *secure,*/ u8 *validate, char* browser, int enctype);
 
 #endif							// _COMMON_H_

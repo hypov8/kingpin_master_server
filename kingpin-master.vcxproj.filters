@@ -10,15 +10,20 @@
     <ClCompile Include="master.c" />
     <ClCompile Include="messages.c" />
     <ClCompile Include="servers.c" />
+    <ClCompile Include="gspy.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Kingpin-master.rc" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="D:\_code_\hypoBrowser\01.png" />
     <None Include="icon_master1.2.ico" />
-    <None Include="help.txt" />
-    <None Include="ip_ignore.txt" />
-    <None Include="ip_rename.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="ip_offline.txt" />
+    <Text Include="ip_weblist.txt" />
+    <Text Include="ip_weblist_gs.txt" />
+    <Text Include="ip_rename.txt" />
+    <Text Include="ip_ignore.txt" />
+    <Text Include="help.txt" />
   </ItemGroup>
 </Project>

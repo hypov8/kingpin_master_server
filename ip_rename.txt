@@ -1,5 +1,12 @@
-//rename. used for local ip's
+// ip/dns rename. used for local servers running on the same lan as the master
+// this sets the ip sent to the clients
 //
-// <local ip> = <dns name>
+// in server.cfg set a matching lan ip to use remaped ip
+// eg.. 
+// setmaster 192.168.1.124
 //
-//192.168.1.124=kp.servegame.com
+//
+// <local ip> = <dns name/ip>
+//
+//192.168.1.124=kp.server.com
+//127.0.0.1=kp.server.com

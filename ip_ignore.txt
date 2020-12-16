@@ -1,5 +1,5 @@
-//ip's to ignore
-//rechecked every 60 seconds
-//ip address only
+// ip's to ignore
+// re'checked every 60 seconds
+// ip address only
 //
 //202.1.1.202
