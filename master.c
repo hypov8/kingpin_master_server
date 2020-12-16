@@ -1396,8 +1396,12 @@ static void MAST_Check_WebList(qboolean isGS)
 	for(i = 0; i < MAX_WEBLIST; i++)
 	{
 		//did not disconect properly
-		if (webSock_tcp[i] != INVALID_SOCKET)
-			SocketError_close(webSock_tcp[i], SOCKET_WEB, i);
+		if ( webSock_tcp[ i ] != INVALID_SOCKET )
+		{
+			if (shutdown(webSock_tcp[i], TCP_SHUTBOTH) == SOCKET_ERROR)
+				MsgPrint(MSG_WARNING, "WARNING: WEBLIST 'shutdown' Failed. (Error: %d)\n", ERRORNUM);
+			SocketError_close(webSock_tcp[ i ], SOCKET_WEB, i);
+		}
 	}
 
 
@@ -1517,26 +1521,28 @@ static void MAST_WebList_Responce(int recieveSock)
 	if (shutdown(webSock_tcp[recieveSock], TCP_SHUTBOTH) == SOCKET_ERROR){
 		MsgPrint(MSG_WARNING, "WARNING: WEBLIST 'shutdown' Failed. (Error: %d)\n", ERRORNUM);
 		SocketError_close(webSock_tcp[recieveSock], SOCKET_WEB, recieveSock);
-		return;
+		//return;
 	}
 	SocketError_close(webSock_tcp[recieveSock], SOCKET_WEB, recieveSock);
 
 
 	if (MAST_parseWebListIPs(recvbufAll))
 	{	
-		if (isWebGSPort)
-			MsgPrint(MSG_NORMAL, "WEBLIST: Sending '\\status\\' to %d servers\n", numwebList);
-		else
-			MsgPrint(MSG_NORMAL, "WEBLIST: Sending 'yyyystatus' to %d servers\n", numwebList);
-
-		for (i = 0; i < numwebList; i++)
+		if (numwebList)
 		{
-			if (isWebGSPort)
-				Sv_PingOfflineList(webList_ptr[i].address, webList_ptr[i].port, qtrue);
+			if ( isWebGSPort )
+				MsgPrint(MSG_NORMAL, "WEBLIST: Sending '\\status\\' to %d servers\n", numwebList);
 			else
-				Sv_PingOfflineList(webList_ptr[i].address, webList_ptr[i].port, qfalse);
-		}
+				MsgPrint(MSG_NORMAL, "WEBLIST: Sending 'yyyystatus' to %d servers\n", numwebList);
 
+			for ( i = 0; i < numwebList; i++ )
+			{
+				if ( isWebGSPort )
+					Sv_PingOfflineList(webList_ptr[ i ].address, webList_ptr[ i ].port, qtrue);
+				else
+					Sv_PingOfflineList(webList_ptr[ i ].address, webList_ptr[ i ].port, qfalse);
+			}
+		}
 		free(webList_ptr);
 		webList_ptr = NULL;
 	}
@@ -1965,6 +1971,8 @@ int main(int argc, const char *argv[])
 				char tmpIP[128];
 				snprintf(tmpIP, sizeof(tmpIP), "%s:%hu", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
 				MsgPrint(MSG_WARNING, "%-21s ---> CLIENT: in ignore list \n", tmpIP);
+				if (shutdown(clientinfo_tcp[cliID].socknum, TCP_SHUTBOTH) == SOCKET_ERROR)
+					MsgPrint(MSG_WARNING, "WARNING: TCP 'shutdown' Failed. (Error: %i)", ERRORNUM);
 				SocketError_close(clientinfo_tcp[cliID].socknum, SOCKET_CLIENT, cliID);
 				continue;
 			}
@@ -1973,6 +1981,8 @@ int main(int argc, const char *argv[])
 				char tmpIP[128];
 				snprintf(tmpIP, sizeof(tmpIP), "%s:%hu", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
 				MsgPrint(MSG_WARNING, "%-21s ---> FLOOD: Client Rejected\n", tmpIP);
+				if (shutdown(clientinfo_tcp[cliID].socknum, TCP_SHUTBOTH) == SOCKET_ERROR)
+					MsgPrint(MSG_WARNING, "WARNING: TCP 'shutdown' Failed. (Error: %i)", ERRORNUM);
 				SocketError_close(clientinfo_tcp[cliID].socknum, SOCKET_CLIENT, cliID);
 				continue;
 			}
