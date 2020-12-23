@@ -138,5 +138,9 @@ void			Sv_PingTimeOut_GamePort(void);
 void Sv_PingOfflineList(char *ip, char *port, qboolean isGSpy);
 
 qboolean Sv_ResolveAddr(const char *name, struct sockaddr_in *addr);//hypo make global
+#ifdef _DEBUG
+void SV_ClearMem(void);
+void sv_memCheck(char *printString);
+#endif
 
 #endif							// _SERVERS_H_

@@ -833,7 +833,6 @@ typedef struct
 static time_t   lastParseTime = 0;
 static int      numIgnoreAddresses = 0;
 static ignoreAddress_t *ignoreAddresses = NULL;
-static ignoreAddress_t *ipAddresses = NULL; //hypov8 ip rename
 
 //offline list
 static time_t   lastParseTimeOffline = 0;
@@ -841,9 +840,9 @@ static int      numOfflineList = 0;
 static offlineList_t *offlineList_ptr = NULL;
 
 //web list
-static int     numwebList = 0; 
+//static int     numwebList = 0; 
 static offlineList_t *webList_ptr = NULL;
-static webList_t	webString[3];
+static webList_t	webString[MAX_WEBLIST];
 
 /*
 ====================
@@ -863,8 +862,13 @@ static qboolean MAST_parseIgnoreAddress(void)
 	timediff = crt_time - lastParseTime;
 
 	// Only reparse periodically
-	if (timediff < PARSE_INTERVAL)
-		return qtrue;
+	if ( timediff < PARSE_INTERVAL )
+	{
+		if ( ignoreAddresses != NULL )
+			return qtrue; //process ignore list
+		else
+			return qfalse; //error
+	}
 
 	lastParseTime = time(NULL);
 
@@ -945,21 +949,20 @@ static qboolean MAST_parseIgnoreAddress(void)
 				// Make list bigger
 				if (numIgnoreAddresses >= numAllocIgnoreAddresses)
 				{
-					ignoreAddress_t *new;
+					ignoreAddress_t *tmp_ptr;
 
 					numAllocIgnoreAddresses *= 2;
-					new = realloc(ignoreAddresses, sizeof(ignoreAddress_t) * numAllocIgnoreAddresses);
+					tmp_ptr = ignoreAddresses;
+					ignoreAddresses = realloc(ignoreAddresses, sizeof(ignoreAddress_t) * numAllocIgnoreAddresses);
 
 					// Alloc failed, fail parsing
-					if (new == NULL)
+					if ( ignoreAddresses == NULL )
 					{
 						fclose(f);
-						free(ignoreAddresses);
+						free(tmp_ptr);
 						ignoreAddresses = NULL;
 						return qfalse;
 					}
-
-					ignoreAddresses = new;
 				}
 			}
 		}
@@ -978,28 +981,14 @@ MAST_parseOfflineList
 hypo offline list to ping
 ====================
 */
-static qboolean MAST_parseOfflineList(void)//char* webText
+static qboolean MAST_parseOfflineList(int numAllocOfflineList, int * numOfflineList)
 {
-	int			numAllocOfflineList = 1;
 	FILE		*f = NULL;
 	char		s[ADDRESS_LENGTHMAX];
-
-
-	if (offlineList_ptr != NULL)
-		MsgPrint(MSG_WARNING, "WARNING: OfflineList pointer not free\n");
 
 	MsgPrint(MSG_DEBUG, "Loading... %s\n", ipOfflineFile_Name);
 	f = fopen(ipOfflineFile_Name, "r");
 	if (!f)	{
-		return qfalse;
-	}
-
-	//reset list count
-	numOfflineList = 0;
-
-	//allocate memory
-	offlineList_ptr = malloc(sizeof(offlineList_t) * numAllocOfflineList);
-	if (offlineList_ptr == NULL) {
 		return qfalse;
 	}
 
@@ -1029,28 +1018,25 @@ static qboolean MAST_parseOfflineList(void)//char* webText
 			}
 		}
 		//copy port and ip
-		strcpy(offlineList_ptr[numOfflineList].port, port);
-		strcpy(offlineList_ptr[numOfflineList].address, s);
-		numOfflineList++;
+		strcpy(offlineList_ptr[*numOfflineList].port, port);
+		strcpy(offlineList_ptr[*numOfflineList].address, s);
+		*numOfflineList = *numOfflineList + 1;
 
 		// Make list bigger
-		if (numOfflineList >= numAllocOfflineList)
+		if (*numOfflineList >= numAllocOfflineList)
 		{
-			offlineList_t *reDefList;
+			offlineList_t *tmp_ptr;
 
 			numAllocOfflineList *= 2;
-			reDefList = realloc(offlineList_ptr, sizeof(offlineList_t) * numAllocOfflineList);
+			tmp_ptr = offlineList_ptr;
+			offlineList_ptr = realloc(offlineList_ptr, sizeof(offlineList_t) * numAllocOfflineList);
 
 			// Alloc failed, fail parsing
-			if (reDefList == NULL)
-			{
+			if (offlineList_ptr == NULL) {
+				offlineList_ptr = tmp_ptr;
 				fclose(f);
-				free(offlineList_ptr);
-				offlineList_ptr = NULL;
 				return qfalse;
 			}
-			else
-				offlineList_ptr = reDefList;
 		}
 	}
 
@@ -1067,7 +1053,9 @@ static qboolean MAST_parseWebListFile(qboolean isGSPorts)//char* webText
 	char	*s, line[1024];
 	char	*tmpPort, *tmpFile;
 
-	memset(&webString, 0, sizeof(webString));
+	memset(&webString[0], 0, sizeof(webString[0]));
+	memset(&webString[1], 0, sizeof(webString[1]));
+	memset(&webString[2], 0, sizeof(webString[2]));
 
 	if ( isGSPorts ) {
 		MsgPrint(MSG_DEBUG, "Loading... %s\n", webListFile_gs_Name);
@@ -1142,26 +1130,12 @@ static qboolean MAST_parseWebListFile(qboolean isGSPorts)//char* webText
 	return qtrue;
 }
 
-static qboolean MAST_parseWebListIPs(const char* webText)//
+static qboolean MAST_parseWebListIPs(const char* webText, int numAllocWebList, int *numwebList)
 {
-	int             numAllocWebList = 1;
 	int             i, j, k;
-	qboolean		Error =1;
-	char* split_request;
-
-
-	// Free existing list
-	if (webList_ptr != NULL)
-		MsgPrint(MSG_WARNING, "WARNING: OfflineList pointer not free\n");
-
-
-	numwebList = 0;
-	webList_ptr = malloc(sizeof(offlineList_t) * numAllocWebList);
-
-	// Alloc failed, fail parsing
-	if (webList_ptr == NULL)
-		return qfalse;
-
+	qboolean		Error = 1;
+	char			*split_request;
+	
 
 	split_request = strtok((char*)webText, "\r\n");
 	while (split_request != NULL)
@@ -1188,7 +1162,11 @@ static qboolean MAST_parseWebListIPs(const char* webText)//
 	}
 
 
-	if (!Error)
+	if (Error)
+	{
+		return qfalse;
+	}
+	else
 	{
 		char            c;
 		char            buffer[ADDRESS_LENGTHMAX];
@@ -1250,39 +1228,32 @@ static qboolean MAST_parseWebListIPs(const char* webText)//
 			} while ((c = split_request[i])!=0 && (c != '\r' || c != '\n') );
 
 
-			strcpy(webList_ptr[numwebList].address, buffer);
-			strcpy(webList_ptr[numwebList].port, bufferPort);
+			strcpy(webList_ptr[*numwebList].address, buffer);
+			strcpy(webList_ptr[*numwebList].port, bufferPort);
 
-			numwebList++;
+			*numwebList = *numwebList + 1;
 
 			// Make list bigger
-			if (numwebList >= numAllocWebList)
+			if (*numwebList >= numAllocWebList)
 			{
-				offlineList_t *new;
+				offlineList_t *tmp_ptr;
 
 				numAllocWebList *= 2;
-				new = realloc(webList_ptr, sizeof(offlineList_t) * numAllocWebList);
+				tmp_ptr = webList_ptr;
+				webList_ptr = realloc(webList_ptr, sizeof(offlineList_t) * numAllocWebList);
 
 				// Alloc failed, fail parsing
-				if (new == NULL)
-				{
-					free(webList_ptr);
-					webList_ptr = NULL;
+				if (webList_ptr == NULL) {
+					webList_ptr = tmp_ptr;
 					return qfalse;
 				}
-
-				webList_ptr = new;
 			}
 
 			split_request = strtok(NULL, "\r\n");
 		} //while (split_request != NULL);
-
 	} 
-	else
-		return qfalse;
 
 	return qtrue;
-
 }
 
 
@@ -1329,28 +1300,45 @@ Load offline list
 static void MAST_Check_OfflineList()
 {
 	int             i;
+	int numAllocOfflineList = 3;
+	int numOfflineList = 0;
 
 	if (ping_list_time != 0) // let weblist load next
 		ping_list_time = crt_time + REFRESH_TIME_WEBLIST;
 
 	MsgPrint(MSG_DEBUG, "Processing Offline List\n");
 
-	if (!MAST_parseOfflineList())
+	//allocate memory
+	offlineList_ptr = malloc(sizeof(offlineList_t) * numAllocOfflineList);
+	if (offlineList_ptr == NULL) {
+		return;
+	}
+#ifdef _DEBUG
+sv_memCheck("load offline");
+#endif
+	if (!MAST_parseOfflineList(numAllocOfflineList, &numOfflineList))
 	{	// Couldn't parse, offline list
 		MsgPrint(MSG_DEBUG, "OFFLINELIST: Failed\n");
 		return;
 	}
 	else
 	{
+#ifdef _DEBUG
+sv_memCheck("ping1");
+#endif
 		for ( i = 0; i < numOfflineList; i++ )
 		{
 			Sv_PingOfflineList(offlineList_ptr[ i ].address, offlineList_ptr[ i ].port, qfalse);
 		}
-
-		//clear old memory
-		free(offlineList_ptr);
-		offlineList_ptr = NULL;
+#ifdef _DEBUG
+sv_memCheck("ping2");
+#endif
 	}
+
+	//clear old memory
+	free(offlineList_ptr);
+	offlineList_ptr = NULL;
+
 }
 
 
@@ -1371,7 +1359,7 @@ static void MAST_Check_WebList(qboolean isGS)
 	char message1[] = "GET ";
 	char message2[] = " HTTP/1.1\r\nHost: ";
 	char message3[]="\r\n\r\n";
-	char* webListFileNameString;
+	const char* webListFileNameString;
 
 	//set time for next refresh
 	if (ping_list_time == 0)
@@ -1382,13 +1370,13 @@ static void MAST_Check_WebList(qboolean isGS)
 	if ( isGS )
 	{
 		MsgPrint(MSG_DEBUG, "Processing WebList: Gamespy\n");
-		webListFileNameString = ( char* ) webListFile_gs_Name;
+		webListFileNameString = webListFile_gs_Name;
 		isWebGSPort = qtrue; //set responce type
 	}
 	else
 	{
 		MsgPrint(MSG_DEBUG, "Processing WebList: Gameport\n");
-		webListFileNameString = ( char* ) webListFile_gp_Name;
+		webListFileNameString = webListFile_gp_Name;
 		isWebGSPort = qfalse; //set responce type
 	}
 
@@ -1479,10 +1467,12 @@ respopnce from WebList
 */
 static void MAST_WebList_Responce(int recieveSock)
 {
-	int		i, bufChars,iResult;
-	char	recvbuf[MAX_PACKET_SIZE_RECV+1];
-	char	recvbufAll[MAX_PACKET_SIZE_RECV * 3+1];
-	int		recvbufLen = MAX_PACKET_SIZE_RECV;
+	int				i, bufChars,iResult;
+	char			recvbuf[MAX_PACKET_SIZE_RECV+1];
+	char			recvbufAll[MAX_PACKET_SIZE_RECV * 3+1];
+	int				recvbufLen = MAX_PACKET_SIZE_RECV;
+	int				numwebList = 0; 
+
 	bufChars = 0;
 	i = 0;
 
@@ -1525,8 +1515,13 @@ static void MAST_WebList_Responce(int recieveSock)
 	}
 	SocketError_close(webSock_tcp[recieveSock], SOCKET_WEB, recieveSock);
 
+	//create memory for 3 servers initaly
+	webList_ptr = malloc(sizeof(offlineList_t) * MAX_WEBLIST);
+	// Alloc failed, fail parsing
+	if (webList_ptr == NULL)
+		return ;
 
-	if (MAST_parseWebListIPs(recvbufAll))
+	if (MAST_parseWebListIPs(recvbufAll, MAX_WEBLIST, &numwebList))
 	{	
 		if (numwebList)
 		{
@@ -1543,8 +1538,6 @@ static void MAST_WebList_Responce(int recieveSock)
 					Sv_PingOfflineList(webList_ptr[ i ].address, webList_ptr[ i ].port, qfalse);
 			}
 		}
-		free(webList_ptr);
-		webList_ptr = NULL;
 	}
 	else
 	{
@@ -1553,7 +1546,9 @@ static void MAST_WebList_Responce(int recieveSock)
 		return;
 	}
 
-
+	//if (webList_ptr != NULL)
+	free(webList_ptr);
+	webList_ptr = NULL;
 }
 
 
@@ -1575,8 +1570,6 @@ qboolean MAST_parseIPConversionFile(void)
 	if (!f)
 	{
 		MsgPrint(MSG_WARNING, "WARNING: Cound not open 'ip_rename.txt' \n");
-		free(ipAddresses);
-		ipAddresses = NULL;
 		return qfalse;
 	}
 
@@ -1658,6 +1651,7 @@ void replaceNullChar(char *packet, int packet_len)
 }
 
 
+
 /*
 ====================
 MAST_GlobalTimedEvent
@@ -1669,6 +1663,11 @@ static void MAST_GlobalTimedEvent(void)
 {
 	static short listIdx = 1; //get gameport 1st
 	int i;
+
+#ifdef _DEBUG
+sv_memCheck("0");
+#endif
+
 
 	//timeout clients
 	for (i = 0; i < MAX_CLIENTS; i++)	
@@ -1685,6 +1684,9 @@ static void MAST_GlobalTimedEvent(void)
 		}
 	}
 
+#ifdef _DEBUG
+sv_memCheck("1");
+#endif
 	// hypo update servers about to time out. when no activity
 	if (ping_timoutSV_time < crt_time)	
 	{
@@ -1692,8 +1694,10 @@ static void MAST_GlobalTimedEvent(void)
 		ping_timoutSV_time = crt_time + 20; //check every 20 secs
 	}
 
-#if 1 //debug
-	//MAST_Check_OfflineList();
+#ifdef _DEBUG
+sv_memCheck("2");
+	MAST_Check_OfflineList();
+sv_memCheck("3");
 #endif
 	//get servers from txt files
 	if (ping_list_time < crt_time)
@@ -1717,12 +1721,21 @@ static void MAST_GlobalTimedEvent(void)
 			listIdx = 0;
 	}
 
+#ifdef _DEBUG
+sv_memCheck("4");
+#endif
+
 	// hypov8 try resolve dns names every 5 min(dynamic ip's)
 	if (!isStaticIPHost && ping_dns_time < crt_time)	
 	{	
 		Sv_ResolveAddressMappings();
 		ping_dns_time = crt_time + REFRESH_TIME_DNS; //5 min
 	}
+
+#ifdef _DEBUG
+sv_memCheck("5");
+#endif
+
 }
 
 //compatability??
@@ -1735,6 +1748,26 @@ void Sys_Sleep(int ms)
 #endif
 
 }
+
+#ifdef _DEBUG
+BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
+{
+    switch (fdwCtrlType)
+    {
+	//exit.
+    case CTRL_CLOSE_EVENT:
+    case CTRL_BREAK_EVENT:
+        printf("Ctrl-Close event\n\n");
+		SV_ClearMem( );
+		if ( ignoreAddresses != NULL )
+			free(ignoreAddresses);
+        return TRUE;
+
+    default:
+        return FALSE;
+    }
+}
+#endif
 
 /*
 ====================
@@ -1787,6 +1820,13 @@ int main(int argc, const char *argv[])
 		Sys_Sleep(5000); //5 seconds
 		return EXIT_FAILURE;
 	}
+#ifdef _DEBUG
+	if ( !( SetConsoleCtrlHandler(CtrlHandler, TRUE) ) )	{
+		MsgPrint(MSG_ERROR, "\n  --==  SHUTTING DOWN  ==--\n");
+		Sys_Sleep(5000); //5 seconds
+		return EXIT_FAILURE;
+	}
+#endif
 
 	MsgPrint(MSG_NORMAL, "\n");
 
@@ -1867,6 +1907,7 @@ int main(int argc, const char *argv[])
 			Sys_Sleep(100); //100 milliseconds
 			continue;
 		}
+
 
 		isTCP = 0;
 		isClient = 0;
@@ -2149,6 +2190,11 @@ int main(int argc, const char *argv[])
 		}
 	}
 
+#ifdef _DEBUG
+	SV_ClearMem( );
+	if ( ignoreAddresses != NULL )
+		free(ignoreAddresses);
+#endif
 
 	/* allow enough time to spot error */
 	Sys_Sleep(500); //500 milliseconds
@@ -2178,16 +2224,16 @@ int MsgPrint(msg_level_t msg_level, const char *format, ...)
 		return 0; 
 
 
-
-
 #ifdef WIN32
-	if (!(hStdout == INVALID_HANDLE_VALUE))
-		if (msg_level==1)
+	if ( !( hStdout == INVALID_HANDLE_VALUE ) )
+	{
+		if ( msg_level == 1 )
 			SetConsoleTextAttribute(hStdout, FOREGROUND_RED /*| FOREGROUND_INTENSITY*/);
-		else if (msg_level == 2)
+		else if ( msg_level == 2 )
 			SetConsoleTextAttribute(hStdout, FOREGROUND_GREEN | FOREGROUND_RED /*| FOREGROUND_INTENSITY*/);
-	//SetTextColor(1, 3);
-	// SetConsoleTextAttribute();
+		//SetTextColor(1, 3);
+		// SetConsoleTextAttribute();
+	}
 #endif
 
 	va_start(args, format);
@@ -2198,11 +2244,13 @@ int MsgPrint(msg_level_t msg_level, const char *format, ...)
 
 #ifdef WIN32
 	//reset to white
-	if (!(hStdout == INVALID_HANDLE_VALUE))
-		if (msg_level==1)
+	if ( !( hStdout == INVALID_HANDLE_VALUE ) )
+	{
+		if ( msg_level == 1 )
 			SetConsoleTextAttribute(hStdout, FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_BLUE);
-		else if (msg_level == 2)
-			SetConsoleTextAttribute(hStdout, FOREGROUND_GREEN | FOREGROUND_RED |FOREGROUND_BLUE);
+		else if ( msg_level == 2 )
+			SetConsoleTextAttribute(hStdout, FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_BLUE);
+	}
 #endif
 
 	return result;

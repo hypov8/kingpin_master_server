@@ -57,6 +57,7 @@ static addrmap_t *sv_addrmaps = NULL;
 
 // ---------- Private functions ---------- //
 
+
 /*
 ====================
 Sv_AddressHash
@@ -117,44 +118,83 @@ name may include a port number, after a ':'
 */
 qboolean Sv_ResolveAddr(const char *name, struct sockaddr_in *addr)//hypo was static
 {
-	char           *namecpy, *port;
+	char           /**namecpy,*/ *port;
+	static char namecpy[ 256 ];
 	struct hostent *host;
-
-	// Create a work copy
-	namecpy = x_strdup(name);
-	if(namecpy == NULL)
-	{
-		MsgPrint(MSG_ERROR, "ERROR: can't allocate enough memory to resolve %s\n", name);
-		return qfalse;
-	}
+#ifdef _DEBUG
+	int i, dotCount=0, name_isDNS = qfalse;
+	unsigned long ulAddr = INADDR_NONE;
+#endif
+	strcpy(namecpy, name);
 
 	// Find the port in the address
 	port = strchr(namecpy, ':');
 	if(port != NULL)
 		*port++ = '\0';
 
-	// Resolve the address
-	host = gethostbyname(namecpy);
-	if(host == NULL)
+#ifdef _DEBUG
+	//check if string is ipv4 or dns
+	for ( i = 0; i < (int)strlen(namecpy); i++ )
 	{
-		MsgPrint(MSG_ERROR, "ERROR: can't resolve %s\n", namecpy);
-		free(namecpy);
-		return qfalse;
-	}
-	if(host->h_addrtype != AF_INET)
-	{
-		MsgPrint(MSG_ERROR, "ERROR: %s is not an IPv4 address\n", namecpy);
-		free(namecpy);
-		return qfalse;
+		if ( namecpy[ i ] == '.' )
+			dotCount += 1;
+
+		if ( isalpha(namecpy[ i ]) )
+		{
+			name_isDNS = qtrue;
+			break;
+		}
 	}
 
-	// Build the structure
-	memset(addr, 0, sizeof(*addr));
-	addr->sin_family = AF_INET;
-	memcpy(&addr->sin_addr.s_addr, host->h_addr, sizeof(addr->sin_addr.s_addr));
+	// Resolve the address
+	if ( !name_isDNS )
+	{
+		ulAddr = inet_addr(namecpy);
+		if(ulAddr == INADDR_NONE)
+		{
+			MsgPrint(MSG_ERROR, "ERROR: can't resolve %s\n", namecpy);
+			//free(namecpy);
+			return qfalse;
+		}
+
+		// Build the structure
+		memset(addr, 0, sizeof(*addr));
+		addr->sin_family = AF_INET;
+		addr->sin_addr.s_addr = ulAddr;
+	}
+	else
+#endif
+	{
+#ifdef _DEBUG
+sv_memCheck("__host1");
+#endif
+		//getaddrinfo(namecpy,port, )
+		host = gethostbyname(namecpy); //using additional memory..
+#ifdef _DEBUG
+sv_memCheck("__host2");
+#endif
+		if(host == NULL)
+		{
+			MsgPrint(MSG_ERROR, "ERROR: can't resolve %s\n", namecpy);
+			return qfalse;
+		}
+		if(host->h_addrtype != AF_INET)
+		{
+			MsgPrint(MSG_ERROR, "ERROR: %s is not an IPv4 address\n", namecpy);
+			return qfalse;
+		}
+
+		// Build the structure
+		memset(addr, 0, sizeof(*addr));
+		addr->sin_family = AF_INET;
+		memcpy(&addr->sin_addr.s_addr, host->h_addr, sizeof(addr->sin_addr.s_addr));
+	}
+
+	//ip
 	if ( port != NULL )
 	{
 		addr->sin_port = htons(( unsigned short ) atoi(port));
+
 		MsgPrint(MSG_DEBUG, "%-21s DNS resolved to %s:%hu\n",
 			name, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
 	}
@@ -164,7 +204,6 @@ qboolean Sv_ResolveAddr(const char *name, struct sockaddr_in *addr)//hypo was st
 			name, inet_ntoa(addr->sin_addr));
 	}
 
-	free(namecpy);
 	return qtrue;
 }
 
@@ -332,6 +371,24 @@ static qboolean Sv_IsActive(server_t * server)
 
 // ---------- Public functions (servers) ---------- //
 
+#ifdef _DEBUG
+void sv_memCheck(char *printString)
+{
+	int i = -1, j = 0;
+	static SIZE_T lastMemSize = 0;
+	static int hashUsed =0;
+
+	GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
+
+	if ( pmc.PeakWorkingSetSize > lastMemSize ){
+		if (lastMemSize !=0 )
+			MsgPrint(MSG_ERROR, "mem size changed (%s)\n", printString);
+		lastMemSize = pmc.PeakWorkingSetSize;
+	}
+
+}
+#endif
+
 /*
 ====================
 Sv_SetHashSize
@@ -494,13 +551,16 @@ void Sv_PingOfflineList(char *ip, char *port, qboolean isGSpy)
 		strcpy(packet, M2S_GETSTATUS_GS);
 	else
 		strcpy(packet, M2S_GETSTATUS_YYYY);
-
-
+#ifdef _DEBUG
+sv_memCheck("__res1");
+#endif
 	memset(&tmpServerAddress, 0, sizeof(tmpServerAddress));
 
 	if (!Sv_ResolveAddr(ip, &tmpServerAddress))
 		return;
-
+#ifdef _DEBUG
+sv_memCheck("__res2");
+#endif
 	tmpServerAddress.sin_port = htons((u_short)atoi(port));
 
 	if (!tmpServerAddress.sin_port){
@@ -560,8 +620,9 @@ void Sv_PingOfflineList(char *ip, char *port, qboolean isGSpy)
 			}
 		}
 	}
-
-
+#ifdef _DEBUG
+sv_memCheck("__ping1");
+#endif
 	// ping offline servers not in master
 #ifdef USE_ALT_OUTPORT
 	nb_bytes = sendto(outSock_udp, packet, strlen(packet), 0,
@@ -576,6 +637,9 @@ void Sv_PingOfflineList(char *ip, char *port, qboolean isGSpy)
 			tmpIP, "WARNING: 'sendto' offlineList\n", ERRORNUM);
 	}
 
+#endif
+#ifdef _DEBUG
+sv_memCheck("__ping2");
 #endif
 }
 
@@ -870,3 +934,25 @@ qboolean Sv_ResolveAddressMappings(void)
 
 	return qfalse;
 }
+
+#ifdef _DEBUG
+void SV_ClearMem(void)
+{
+	addrmap_t      *addrmap = sv_addrmaps;
+
+	if (servers!= NULL)
+		free(servers);
+	if (hash_table!= NULL)
+		free(hash_table);
+
+	while ( addrmap!= NULL )
+	{
+		addrmap_t *tmp;
+		free(addrmap->from_string);
+		free(addrmap->to_string);
+		tmp = addrmap;
+		addrmap = addrmap->next;
+		free(tmp);
+	}
+}
+#endif
