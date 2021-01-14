@@ -34,13 +34,15 @@
 
 #ifdef WIN32
 # include <winsock2.h>
-	#ifdef _DEBUG
+
+#ifdef _DEBUG
 	# include <vld.h> //debug mem
 	//#include "windows.h"
 	#include "psapi.h" //mem size
 	//#include <ws2tcpip.h>
 	PROCESS_MEMORY_COUNTERS_EX pmc;
-	#endif
+#endif
+
 #else
 # include <netinet/in.h>
 # include <arpa/inet.h>

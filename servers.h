@@ -51,6 +51,7 @@ typedef struct addrmap_s
 	struct sockaddr_in to;
 	char           *from_string;
 	char           *to_string;
+	qboolean		used; //used by a server. dont delete if dns fails
 } addrmap_t;
 
 // Server properties

@@ -116,11 +116,11 @@ Resolve an internet address
 name may include a port number, after a ':'
 ====================
 */
-qboolean Sv_ResolveAddr(const char *name, struct sockaddr_in *addr)//hypo was static
+qboolean Sv_ResolveAddr(const char *name, struct sockaddr_in *addr)
 {
 	char           /**namecpy,*/ *port;
 	static char namecpy[ 256 ];
-	struct hostent *host;
+	struct hostent *host = NULL;
 #ifdef _DEBUG
 	int i, dotCount=0, name_isDNS = qfalse;
 	unsigned long ulAddr = INADDR_NONE;
@@ -152,7 +152,7 @@ qboolean Sv_ResolveAddr(const char *name, struct sockaddr_in *addr)//hypo was st
 		ulAddr = inet_addr(namecpy);
 		if(ulAddr == INADDR_NONE)
 		{
-			MsgPrint(MSG_ERROR, "ERROR: can't resolve %s\n", namecpy);
+			MsgPrint(MSG_ERROR, "ERROR: can\'t resolve %s\n", namecpy);
 			//free(namecpy);
 			return qfalse;
 		}
@@ -175,12 +175,27 @@ sv_memCheck("__host2");
 #endif
 		if(host == NULL)
 		{
-			MsgPrint(MSG_ERROR, "ERROR: can't resolve %s\n", namecpy);
+			MsgPrint(MSG_ERROR, "ERROR: Can\'t resolve %s\n", namecpy);
 			return qfalse;
 		}
 		if(host->h_addrtype != AF_INET)
 		{
 			MsgPrint(MSG_ERROR, "ERROR: %s is not an IPv4 address\n", namecpy);
+			return qfalse;
+		}
+
+		// 0.0.0.0 addresses are forbidden
+		 if ((ntohl(*(u_long*)host->h_addr) >> 0) == 0 &&	 (ntohl(*(u_long*)host->h_addr) >> 8) == 0 &&
+			 (ntohl(*(u_long*)host->h_addr) >> 16) == 0 && (ntohl(*(u_long*)host->h_addr) >> 24) == 0 )
+		{
+			MsgPrint(MSG_ERROR, "ERROR: Mapping from or to 0.0.0.0 is forbidden\n");
+			return qfalse;
+		}
+
+		// Do NOT allow mapping to loopback addresses
+		 if ((ntohl(*(u_long*)host->h_addr) >> 24) == 127)
+		{
+			MsgPrint(MSG_ERROR, "ERROR: Mapping to a loopback address is forbidden\n");
 			return qfalse;
 		}
 
@@ -233,9 +248,11 @@ static void Sv_InsertAddrmapIntoList(addrmap_t * new_map)
 				MsgPrint(MSG_WARNING,
 						 "WARNING: Address %s:%hu has several mappings\n",
 						 inet_ntoa(new_map->from.sin_addr), ntohs(new_map->from.sin_port));
-
-				*prev = addrmap->next;
-				free(addrmap);
+				if ( !addrmap->used )
+				{
+					*prev = addrmap->next;
+					free(addrmap);
+				}
 			}
 			break;
 		}
@@ -445,7 +462,7 @@ qboolean Sv_Init(void)
 	servers = malloc(array_size);
 	if(!servers)
 	{
-		MsgPrint(MSG_ERROR, "ERROR: can't allocate the servers array (%s)\n", strerror(errno));
+		MsgPrint(MSG_ERROR, "ERROR: can\'t allocate the servers array (%s)\n", strerror(errno));
 		return qfalse;
 	}
 	last_alloc = max_nb_servers - 1;
@@ -457,7 +474,7 @@ qboolean Sv_Init(void)
 	hash_table = malloc(array_size);
 	if(!hash_table)
 	{
-		MsgPrint(MSG_ERROR, "ERROR: can't allocate the hash table (%s)\n", strerror(errno));
+		MsgPrint(MSG_ERROR, "ERROR: can\'t allocate the hash table (%s)\n", strerror(errno));
 		free(servers);
 		return qfalse;
 	}
@@ -573,7 +590,8 @@ sv_memCheck("__res2");
 
 	// 0.0.0.0 addresses are forbidden
 	if (tmpServerAddress.sin_addr.s_addr == 0 || tmpServerAddress.sin_addr.s_addr == 0)	{
-		MsgPrint(MSG_WARNING, "%-21s ---> ERROR: Offline 0.0.0.0 is forbidden\n");
+		snprintf(tmpIP, sizeof(tmpIP), "%s:%S", ip, port);
+		MsgPrint(MSG_WARNING, "%-21s ---> ERROR: Offline 0.0.0.0 is forbidden\n", tmpIP);
 		return;
 	}
 
@@ -634,7 +652,7 @@ sv_memCheck("__ping1");
 	if (nb_bytes == SOCKET_ERROR){
 		snprintf(tmpIP, sizeof(tmpIP), "%s:%S", ip, port);
 		MsgPrint(MSG_WARNING, "%-21s ---> %-22s error:%i\n",
-			tmpIP, "WARNING: 'sendto' offlineList\n", ERRORNUM);
+			tmpIP, "WARNING: \'sendto\' offlineList\n", ERRORNUM);
 	}
 
 #endif
@@ -662,7 +680,7 @@ server_t       *Sv_GetByAddr(const struct sockaddr_in *address, qboolean add_it)
 	// Allow servers on a loopback address ONLY if a mapping is defined for them
 	if((ntohl(address->sin_addr.s_addr) >> 24) == 127 && addrmap == NULL)
 	{
-		MsgPrint(MSG_WARNING, "%-21s ---> WARNING: server isn't allowed (loopback address)\n",peer_address);
+		MsgPrint(MSG_WARNING, "%-21s ---> WARNING: server isn\'t allowed (loopback address)\n",peer_address);
 		return NULL;
 	}
 
@@ -723,6 +741,13 @@ server_t       *Sv_GetByAddr(const struct sockaddr_in *address, qboolean add_it)
 	memcpy(&sv->address, address, sizeof(sv->address));
 	sv->addressReMap = addrmap;
 
+	//mark remap as used. dont delete later if an error
+	if ( addrmap != NULL )
+	{
+		addrmap_t *addrmapTmp;
+		addrmapTmp = (addrmap_t*)addrmap;
+		addrmapTmp->used = qtrue;
+	}
 	// Add it to the list it belongs to
 	sv->next = hash_table[hash];
 	hash_table[hash] = sv;
@@ -822,7 +847,7 @@ qboolean Sv_Add_unResolvedAddressMapping(const char *mapping)
 	map_string = x_strdup(mapping);
 	if(map_string == NULL)
 	{
-		MsgPrint(MSG_ERROR, "ERROR: can't allocate address mapping string\n");
+		MsgPrint(MSG_ERROR, "ERROR: can\'t allocate address mapping string\n");
 		return qfalse;
 	}
 
@@ -849,12 +874,13 @@ qboolean Sv_Add_unResolvedAddressMapping(const char *mapping)
 			tmp->to_string = x_strdup(to_ip);
 			if(tmp->to_string == NULL)
 			{
-				MsgPrint(MSG_ERROR, "ERROR: can't allocate address mapping string.\n");
+				MsgPrint(MSG_ERROR, "ERROR: can\'t allocate address mapping string.\n");
+				free(map_string);
 				return qfalse;
 			}
 			free(map_string);
-			memset(&tmp->from, 0, sizeof(tmp->from));
-			memset(&tmp->to, 0, sizeof(tmp->to));
+			//memset(&tmp->from, 0, sizeof(tmp->from)); //hypov8 note: keep old ip
+			//memset(&tmp->to, 0, sizeof(tmp->to));
 			return qtrue;
 		}
 		tmp = tmp->next;
@@ -864,7 +890,7 @@ qboolean Sv_Add_unResolvedAddressMapping(const char *mapping)
 	addrmap = malloc(sizeof(*addrmap));
 	if(addrmap == NULL)
 	{
-		MsgPrint(MSG_ERROR, "ERROR: can't allocate address mapping structure\n");
+		MsgPrint(MSG_ERROR, "ERROR: can\'t allocate address mapping structure\n");
 		free(map_string);
 		return qfalse;
 	}
@@ -873,7 +899,7 @@ qboolean Sv_Add_unResolvedAddressMapping(const char *mapping)
 	addrmap->to_string = x_strdup(to_ip);
 	if(addrmap->from_string == NULL || addrmap->to_string == NULL)
 	{
-		MsgPrint(MSG_ERROR, "ERROR: can't allocate address mapping strings\n");
+		MsgPrint(MSG_ERROR, "ERROR: can\'t allocate address mapping strings\n");
 		if (addrmap->to_string== NULL)
 			free(addrmap->to_string);
 		if (addrmap->from_string == NULL)
@@ -918,7 +944,7 @@ qboolean Sv_ResolveAddressMappings(void)
 			unresolved = unresolved->next;
 
 			// Continue the resolution, even if there's an error
-			if (!Sv_ResolveAddrmap(addrmap))
+			if (!Sv_ResolveAddrmap(addrmap) && addrmap->used == qfalse)
 			{
 				free(addrmap->from_string);
 				free(addrmap->to_string);
@@ -926,7 +952,7 @@ qboolean Sv_ResolveAddressMappings(void)
 				succeeded = qfalse;
 			}
 			else
-				Sv_InsertAddrmapIntoList(addrmap);
+				Sv_InsertAddrmapIntoList(addrmap); //insert even if failed(keep old entry)
 		}
 
 		return succeeded;

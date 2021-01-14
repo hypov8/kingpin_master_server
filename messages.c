@@ -166,12 +166,12 @@ static void MSG_SendGetStatus_GSPort(const struct sockaddr_in *ServerAddress, SO
 		snprintf(tmpIP, sizeof(tmpIP), "%s:%hu", 
 			inet_ntoa(ServerAddress->sin_addr), ntohs(ServerAddress->sin_port));
 		MsgPrint(MSG_DEBUG, "%-21s <--- %-22s Sent (GameSpy Port) \n",
-			tmpIP, "'\\\\status\\\\'");
+			tmpIP, "\'\\\\status\\\\\'");
 	}
 	else
 	{	//send error
 		MsgPrint(MSG_WARNING, "%-21s <--- %-22s --== Socket Error ==-- \"%i\"\n",
-			peer_address, "'\\\\status\\\\'", ERRORNUM);
+			peer_address, "\'\\\\status\\\\\'", ERRORNUM);
 	}
 }
 
@@ -198,12 +198,12 @@ static void MSG_SendGetStatus_GPort(server_t * server, SOCKET_NET recv_sock)
 #endif
 	{	//send ok
 		MsgPrint(MSG_DEBUG, "%-21s <--- %-22s Sent (Game Port) \n",
-			peer_address, "'YYYYstatus'");
+			peer_address, "\'YYYYstatus\'");
 	}
 	else
 	{	//send error
 		MsgPrint(MSG_WARNING, "%-21s <--- %-22s --== Socket Error ==-- (%i) \n",
-			peer_address, "'YYYYstatus'", ERRORNUM);
+			peer_address, "\'YYYYstatus\'", ERRORNUM);
 	}
 }
 
@@ -237,12 +237,12 @@ static void MSG_SendGetInfo_KPQ3(server_t * server, SOCKET_NET recv_sock)
 #endif
 	{	//sent ok
 		MsgPrint(MSG_DEBUG, "%-21s <--- %-22s challenge (%s) \n",
-			peer_address, "'getinfo'", server->challenge);
+			peer_address, "\'getinfo\'", server->challenge);
 	}
 	else
 	{	//send error
 		MsgPrint(MSG_WARNING, "%-21s <--- %-22s (error: %i) \n",
-			peer_address, "WARNING: cant send 'getinfo'", ERRORNUM);
+			peer_address, "WARNING: cant send \'getinfo\'", ERRORNUM);
 	}
 }
 
@@ -268,12 +268,12 @@ static void MSG_SendPing_GPort(server_t * server, SOCKET_NET recv_sock)
 #endif
 	{	//send ok
 		MsgPrint(MSG_DEBUG, "%-21s <--- %-22s Sent (Game Port) \n",
-			peer_address, "'YYYYPing'");
+			peer_address, "\'YYYYPing\'");
 	}
 	else
 	{	//send error
 		MsgPrint(MSG_WARNING, "%-21s <--- %-22s --== Socket Error ==-- (%i) \n",
-			peer_address, "'YYYYPing'", ERRORNUM);
+			peer_address, "\'YYYYPing\'", ERRORNUM);
 	}
 }
 
@@ -300,12 +300,12 @@ static void MSG_SendAck_GPort(server_t * server, SOCKET_NET recv_sock)
 #endif
 	{	//send ok
 		MsgPrint(MSG_DEBUG, "%-21s <--- %-22s Sent (Game Port) \n",
-			peer_address, "'YYYYAck'");
+			peer_address, "\'YYYYAck\'");
 	}
 	else
 	{	//send error
 		MsgPrint(MSG_DEBUG, "%-21s <--- %-22s --== Socket Error ==-- (%i) \n",
-			peer_address, "'YYYYAck'", ERRORNUM);
+			peer_address, "\'YYYYAck\'", ERRORNUM);
 	}
 }
 
@@ -334,12 +334,12 @@ static void MSG_SendAck_GSPort(server_t * server, SOCKET_NET recv_sock)
 #endif
 	{	//send ok
 		MsgPrint(MSG_DEBUG, "%-21s <--- %-22s Sent (GameSpy Port)\n",
-			peer_address, "'\\\\Ack\\\\'");
+			peer_address, "\'\\\\Ack\\\\\'");
 	}
 	else
 	{	//send error
 		MsgPrint(MSG_DEBUG, "%-21s <--- %-22s --== Socket Error ==-- (%i) \n",
-			peer_address, "'\\\\Ack\\\\'", ERRORNUM);
+			peer_address, "\'\\\\Ack\\\\\'", ERRORNUM);
 	}
 
 }
@@ -400,7 +400,7 @@ static void MSG_RespondToGetServers_GSpyTCP(const struct sockaddr_in *addr, int 
 #endif	
 
 	if (max_msg_level >= MSG_DEBUG) //hypov8 print b4 debug stuff below
-		MsgPrint(MSG_NORMAL, "%-21s ---> %-22s (%s) \n", peer_address, "'getservers'", challenge);
+		MsgPrint(MSG_NORMAL, "%-21s ---> %-22s (%s) \n", peer_address, "\'getservers\'", challenge);
 
 
 	// Initialize the packet contents with the header
@@ -443,7 +443,7 @@ static void MSG_RespondToGetServers_GSpyTCP(const struct sockaddr_in *addr, int 
 
 			MsgPrint(MSG_DEBUG, "%s\n%s \n%s \n",	
 				"=================================================",
-				printStr, 
+				printStr,  //hypov8 todo PrintPacket()
 				"=================================================");
 
 			// If we're done
@@ -693,7 +693,7 @@ static void MSG_RespondToGetServers_KPQ3(const char *msg, const struct sockaddr_
 
 	if ( max_msg_level >= MSG_DEBUG ) { //hypov8 print b4 debug stuff below
 		MsgPrint(MSG_NORMAL, "%-21s ---> %-22s kingpinQ3 (P:%d) \n",
-			peer_address, "'getservers'", protocol);
+			peer_address, "\'getservers\'", protocol);
 	}
 
 	// must exist to show all servers
@@ -736,9 +736,9 @@ static void MSG_RespondToGetServers_KPQ3(const char *msg, const struct sockaddr_
 			}
 			MsgPrint(MSG_DEBUG, "%-21s <--- %-22s KingpinQ3 (%u servers)\n",
 				peer_address, "getservers Response", numServers);
-			MsgPrint(MSG_DEBUG, "%-21s <--- %-22s (packet:' %s ') \n\n",
+			MsgPrint(MSG_DEBUG, "%-21s <--- %-22s (packet:\' %s \') \n\n",
 				peer_address,"Sending servers", packet);
-			MsgPrint(MSG_DEBUG, "%-21s <--- %-22s (packet:' %s ') \n\n",
+			MsgPrint(MSG_DEBUG, "%-21s <--- %-22s (packet:\' %s \') \n\n",
 				peer_address,"Sending servers", printStr);
 
 			// If we're done
@@ -830,20 +830,20 @@ static void MSG_HandleInfoResponse_KPQ3(server_t * server, const char *msg)
 	unsigned int    protocol = 0;
 	unsigned short  maxclients = 0;
 
-	MsgPrint(MSG_DEBUG, "%-21s ---> %-22s \n", peer_address, "'infoResponse'");
+	MsgPrint(MSG_DEBUG, "%-21s ---> %-22s \n", peer_address, "\'infoResponse\'");
 
 	// Check the challenge
 	if (!server->challenge_timeout || server->challenge_timeout < crt_time)
 	{
 		MsgPrint(MSG_WARNING, "%-21s ---> %-22s Obsolete challenge \n",
-			peer_address, "WARNING: 'infoResponse'");
+			peer_address, "WARNING: \'infoResponse\'");
 		return;
 	}
 	value = MSG_SearchInfostring(msg, "challenge");
 	if (!value || strcmp(value, server->challenge))
 	{
 		MsgPrint(MSG_WARNING, "%-21s ---> %-22s Challenge SV(%s) M(%s) \n",
-			peer_address, "WARNING: 'infoResponse'", value, server->challenge);
+			peer_address, "WARNING: \'infoResponse\'", value, server->challenge);
 		return;
 	}
 
@@ -857,7 +857,7 @@ static void MSG_HandleInfoResponse_KPQ3(server_t * server, const char *msg)
 	if (!protocol || !maxclients)
 	{
 		MsgPrint(MSG_WARNING,"%-21s ---> %-22s Invalid (protocol: %d, maxclients: %d) \n",
-			peer_address, "WARNING: 'infoResponse'", protocol, maxclients);
+			peer_address, "WARNING: \'infoResponse\'", protocol, maxclients);
 		return;
 	}
 	server->protocol = protocol;
@@ -873,13 +873,13 @@ static void MSG_HandleInfoResponse_KPQ3(server_t * server, const char *msg)
 	{
 		value = S2M_FLATLINE_KPQ3;	// Q3A doesn't send a gamename, so we add it manually
 		MsgPrint(MSG_WARNING, "%-21s ---> %-22s Invalid gamename\n",
-			peer_address, "WARNING: 'infoResponse'");
+			peer_address, "WARNING: \'infoResponse\'");
 	}
 
 	// If the gamename has changed
-	if (strcmp(server->gamename, value))
+	if (x_strcmpi(server->gamename, value))
 	{
-		if (strcmp(server->gamename ,""))
+		if (x_strcmpi(server->gamename ,""))
 			MsgPrint(MSG_NORMAL, "%-21s ---> %-22s Changed (%s to %s) \n",
 				peer_address, "Server gamename", server->gamename, value);
 
@@ -993,20 +993,20 @@ void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, S
 		value = MSG_SearchInfostring(msg, "gamename");
 		if (value == NULL)	{
 			MsgPrint(MSG_DEBUG, "%-21s ---> %-22s No GameName \n",
-				peer_address, "'\\Heartbeat\\'");
+				peer_address, "\'\\Heartbeat\\\'");
 			return;		
 		}
 #ifdef KINGPIN_ONLY
 		if (!(x_strcmpi(value, "kingpin") == 0)) {
 			MsgPrint(MSG_NORMAL, "%-21s ---> %-22s Not Kingpin (%s) \n",
-				peer_address, "'\\heartbeat\\'", value);
+				peer_address, "\'\\heartbeat\\\'", value);
 			return;		
 		}
 #endif
 		value = MSG_SearchInfostring(msg, "heartbeat"); //port
 		if (value == NULL) {
 			MsgPrint(MSG_DEBUG, "%-21s ---> %-22s No port \n",
-				peer_address, "'\\HeartBeat\\'");
+				peer_address, "\'\\HeartBeat\\\'");
 			return;		
 		}
 
@@ -1018,7 +1018,7 @@ void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, S
 		/* it looks like this is used to make sure gamespy port is open (no firewall) */
 		tmpServerAddress.sin_port = htons((u_short)atoi(value));
 
-		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s \n", peer_address, "'\\\\Heartbeat\\\\'");
+		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s \n", peer_address, "\\\'Heartbeat\\\'");
 
 		/* get more info before storing server */
 		MSG_SendGetStatus_GSPort((const struct sockaddr_in*)&tmpServerAddress, recv_sock); //status//
@@ -1033,7 +1033,7 @@ void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, S
 		value = MSG_SearchInfostring(msg, "protocol");
 		if (value == NULL) {
 			MsgPrint(MSG_NORMAL, "%-21s ---> %-22s No protocol \n", 
-				peer_address, "'\\\\gamename\\\\kingpin'");
+				peer_address, "\'gamename\\\\kingpin\'");
 			return;
 		}
 		protocol = atoi(value);
@@ -1041,7 +1041,7 @@ void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, S
 #ifdef KINGPIN_ONLY
 		if (protocol !=  32) {
 			MsgPrint(MSG_NORMAL, "%-21s ---> %-22s Not Kingpin protocol (%i) \n", 
-				peer_address, "'\\\\gamename\\\\kingpin'", protocol);
+				peer_address, "\'gamename\\\\kingpin\'", protocol);
 			return;
 		}
 #endif	
@@ -1056,7 +1056,7 @@ void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, S
 		value = MSG_SearchInfostring(msg, "hostport");
 		if (value == NULL) {
 			MsgPrint(MSG_NORMAL, "%-21s ---> %-22s No hostport \n", 
-				peer_address, "'\\\\gamename\\\\kingpin'");
+				peer_address, "\'gamename\\\\kingpin\'");
 			return;
 		}
 
@@ -1068,7 +1068,7 @@ void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, S
 		server = Sv_GetByAddr((const struct sockaddr_in*)&tmpServerAddress, qtrue);
 		if (server == NULL) {
 			MsgPrint(MSG_DEBUG, "%-21s ---> %-22s No Server \n", 
-				peer_address, "'\\\\gamename\\\\kingpin'");
+				peer_address, "\'gamename\\\\kingpin\'");
 			return;
 		}
 
@@ -1076,7 +1076,7 @@ void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, S
 		server->active = qtrue;
 		server->protocol = protocol;
 		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s Saved (GameSpy port) \n", 
-			peer_address, "'\\\\gamename\\\\kingpin\\'");
+			peer_address, "\'gamename\\\\kingpin\'");
 		server->timeout = crt_time + TIMEOUT_HEARTBEAT;
 		server->isWaitResponce = qfalse;
 
@@ -1089,7 +1089,7 @@ void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, S
 	{
 		//do nothing
 		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s kingpin.exe\n",
-			peer_address, "'\\\\final\\\\queryid\\\\'");
+			peer_address, "\'final\\\\queryid\'");
 	}
 //
 //end Gamespy packets
@@ -1116,7 +1116,7 @@ void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, S
 		// Extract the game id
 		value = MSG_SearchInfostring(msg +hbLen+offset, "protocol");
 		if (value == NULL)		{
-			MsgPrint(MSG_NORMAL, "%-21s ---> %-22s No protocol found (using kingpin 32) \n", peer_address, "'YYYYHeartbeat'");
+			MsgPrint(MSG_NORMAL, "%-21s ---> %-22s No protocol found (using kingpin 32) \n", peer_address, "\'YYYYHeartbeat\'");
 			protocol = 32;
 		}
 		else
@@ -1124,14 +1124,14 @@ void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, S
 
 #ifdef KINGPIN_ONLY
 		if (protocol !=  32)	{ //force kingpin only servers (no quake2)
-			MsgPrint(MSG_NORMAL, "%-21s ---> %-22s Protocol not 32\n", peer_address, "'YYYYHeartbeat'");
+			MsgPrint(MSG_NORMAL, "%-21s ---> %-22s Protocol not 32\n", peer_address, "\'YYYYHeartbeat\'");
 			return;
 		}
 #endif	
 		// Get the server in the list (add it to the list if necessary)
 		server = Sv_GetByAddr(address, qtrue);
 		if (server == NULL) {
-			MsgPrint(MSG_DEBUG, "%-21s ---> %-22s No Server\n", peer_address, "'YYYYHeartbeat'");
+			MsgPrint(MSG_DEBUG, "%-21s ---> %-22s No Server\n", peer_address, "\'YYYYHeartbeat\'");
 			return;	
 		}
 
@@ -1143,7 +1143,7 @@ void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, S
 		server->protocol = protocol;
 		server->timeout = crt_time + TIMEOUT_HEARTBEAT;
 		server->isWaitResponce = qfalse;
-		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s \n", peer_address, "'YYYYHeartbeat'");
+		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s \n", peer_address, "\'YYYYHeartbeat\'");
 
 		//hypo reply to server. acknowledge packet recieved
 #if 0 
@@ -1171,21 +1171,21 @@ void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, S
 		// Extract the game id
 		value = MSG_SearchInfostring(msg+hbLen+offset, "protocol");
 		if (value == NULL) {
-			MsgPrint(MSG_NORMAL, "%-21s ---> %-22s No protocol \n", peer_address, "'YYYYprint'");
+			MsgPrint(MSG_NORMAL, "%-21s ---> %-22s No protocol \n", peer_address, "\'YYYYprint\'");
 			return;	
 		}
 		protocol = atoi(value);
 
 #ifdef KINGPIN_ONLY
 		if (protocol !=  32)	{
-			MsgPrint(MSG_NORMAL, "%-21s ---> %-22s Protocol not 32 (kingpin) \n", peer_address, "'YYYYprint'");
+			MsgPrint(MSG_NORMAL, "%-21s ---> %-22s Protocol not 32 (kingpin) \n", peer_address, "\'YYYYprint\'");
 			return;	
 		}
 #endif
 		// Get the server in the list (add it to the list if necessary)
 		server = Sv_GetByAddr(address, qtrue);
 		if (server == NULL) {
-			MsgPrint(MSG_DEBUG, "%-21s ---> %-22s No Server \n", peer_address, "'YYYYprint'");
+			MsgPrint(MSG_DEBUG, "%-21s ---> %-22s No Server \n", peer_address, "\'YYYYprint\'");
 			return;		
 		}
 
@@ -1197,7 +1197,7 @@ void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, S
 		server->protocol = protocol;
 		server->timeout = crt_time + TIMEOUT_HEARTBEAT;
 		server->isWaitResponce = qfalse;
-		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s \n", peer_address, "'YYYYprint'");
+		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s \n", peer_address, "\'YYYYprint\'");
 
 		//hypo reply to server. acknowledge packet recieved
 		MSG_SendAck_GPort(server, recv_sock);
@@ -1212,19 +1212,19 @@ void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, S
 		{	//hypov8 server did not send initial heartbeat. add it
 			server = Sv_GetByAddr(address, qtrue);
 			if (server == NULL) {
-				MsgPrint(MSG_DEBUG, "%-21s ---> '%-22s No Server\n", peer_address, "'YYYYShutdown'");
+				MsgPrint(MSG_DEBUG, "%-21s ---> %-22s No Server\n", peer_address, "\'YYYYShutdown\'");
 				return;
 			}
 			server->timeout = crt_time + TIMEOUT_INFORESPONSE;
 			server->isWaitResponce = qtrue;
-			MsgPrint(MSG_DEBUG, "%-21s ---> %-22s add server\n", peer_address, "'YYYYShutdown'");
+			MsgPrint(MSG_DEBUG, "%-21s ---> %-22s add server\n", peer_address, "\'YYYYShutdown\'");
 			MSG_SendGetStatus_GPort(server, recv_sock);
 			return;
 		}
 
 		server->timeout = crt_time + TIMEOUT_PING;
 		server->isWaitResponce = qtrue;
-		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s \n", peer_address, "'YYYYShutdown'");
+		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s \n", peer_address, "\'YYYYShutdown\'");
 
 		/* check if server is active or shutdown */
 		MSG_SendPing_GPort(server, recv_sock);
@@ -1234,7 +1234,7 @@ void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, S
 	{
 		server = Sv_GetByAddr(address, qfalse);
 		if (server == NULL) {
-			MsgPrint(MSG_DEBUG, "%-21s ---> %-22s No Server\n", peer_address, "'YYYYAck'");
+			MsgPrint(MSG_DEBUG, "%-21s ---> %-22s No Server\n", peer_address, "\'YYYYAck\'");
 			return;		
 		}
 
@@ -1251,7 +1251,7 @@ void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, S
 			server = Sv_GetByAddr(address, qtrue);
 			if (server == NULL)
 			{
-				MsgPrint(MSG_DEBUG, "%-21s ---> %-22s No Server\n", peer_address, "'YYYYPing'");
+				MsgPrint(MSG_DEBUG, "%-21s ---> %-22s No Server\n", peer_address, "\'YYYYPing\'");
 				return;	
 			}
 
@@ -1261,7 +1261,7 @@ void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, S
 
 			server->timeout = crt_time + TIMEOUT_INFORESPONSE;
 			server->isWaitResponce = qtrue;
-			MsgPrint(MSG_DEBUG, "%-21s ---> %-22s New Server \n", peer_address, "'YYYYPing'");
+			MsgPrint(MSG_DEBUG, "%-21s ---> %-22s New Server \n", peer_address, "\'YYYYPing\'");
 			MSG_SendGetStatus_GPort(server, recv_sock);
 			return;
 		}
@@ -1272,7 +1272,7 @@ void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, S
 
 		server->timeout = crt_time + TIMEOUT_HEARTBEAT;
 		server->isWaitResponce = qfalse;
-		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s \n", peer_address, "'YYYYPing'");
+		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s \n", peer_address, "\'YYYYPing\'");
 
 		if (!server->protocol){
 			server->timeout = crt_time + TIMEOUT_INFORESPONSE;
@@ -1285,14 +1285,14 @@ void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, S
 //GP.. YYYYgetmotd. client to master. getmotd request. ToDo: motd
 	else if(!strncmp(C2M_GETMOTD, msg, strlen(C2M_GETMOTD)))
 	{
-		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s kp1\n", peer_address, "'getmoto'");
+		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s kp1\n", peer_address, "\'getmoto\'");
 		//hypov8 todo:
 		//MSG_RespondToGetMotd_KP1(msg + strlen(C2M_GETMOTD), address, recv_sock);
 	}
 //GP.. YYYYquery. Quake2 master query.	
 	else if (!strncmp(B2M_GETSERVERS_QUERY, msg, strlen(B2M_GETSERVERS_QUERY)))
 	{
-		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s Request quake server packet \n", peer_address, "'query..'");
+		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s Request quake server packet \n", peer_address, "\'query..\'");
 		MSG_RespondToGetServers_Quake(address, recv_sock);
 	}
 //error
@@ -1322,7 +1322,7 @@ void MSG_HandleMessage_KPQ3(const char *msg, const struct sockaddr_in *address, 
 
 		// Extract the game id
 		sscanf(msg + strlen(S2M_HEARTBEAT_DP) + 1, "%63s", gameId);
-		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s \n", peer_address, "'heartbeat Darkplaces'"/*, gameId*/);
+		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s \n", peer_address, "\'heartbeat Darkplaces\'"/*, gameId*/);
 
 		// Get the server in the list (add it to the list if necessary)
 		server = Sv_GetByAddr(address, qtrue);
@@ -1349,7 +1349,7 @@ void MSG_HandleMessage_KPQ3(const char *msg, const struct sockaddr_in *address, 
 
 		// Extract the game id
 		sscanf(msg + strlen(S2M_HEARTBEAT_KPQ3) + 1, "%63s", gameId);
-		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s \n", peer_address, "'heartbeat KingpinQ3-1'"/*, gameId*/);
+		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s \n", peer_address, "\'heartbeat KingpinQ3-1\'"/*, gameId*/);
 
 		// Get the server in the list (add it to the list if necessary)
 		server = Sv_GetByAddr(address, qtrue);
@@ -1408,7 +1408,7 @@ void MSG_HandleMessage_KPQ3(const char *msg, const struct sockaddr_in *address, 
 			if (server == NULL)
 				return;
 
-			MsgPrint(MSG_DEBUG, "%-21s ---> %-22s (%s) \n", peer_address, "'Flatline'", msg);
+			MsgPrint(MSG_DEBUG, "%-21s ---> %-22s (%s) \n", peer_address, "\'Flatline\'", msg);
 			server->timeout = crt_time /*+ TIMEOUT_CHALLENGE*/; //remove server
 			server->isWaitResponce = qtrue;
 		}

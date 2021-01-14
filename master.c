@@ -38,7 +38,7 @@
 // ---------- Constants ---------- //
 
 // Version of dpmaster
-#define VERSION "1.6.09" //hypov8 version
+#define VERSION "1.6.11" //hypov8 version
 
 // Default master port
 #define DEFAULT_MASTER_PORT 27900 //27900 hypo kingpin
@@ -219,7 +219,6 @@ static qboolean FloodIpStoreReject( struct sockaddr_in *address )
 	static clientTemp_t client;
 	static clientIpCheck_t cli_info[IP_CYCLE_LIST_COUNT];
 
-	// return qfalse; //hypo todo: enable
 #if 1
 	i = client.currentNum;
 	j = 0;
@@ -279,7 +278,7 @@ static qboolean SysInit(void)
 
 	if(WSAStartup(MAKEWORD(1, 1), &winsockdata))
 	{
-		MsgPrint(MSG_ERROR, "ERROR: can't initialize winsocks\n");
+		MsgPrint(MSG_ERROR, "ERROR: can\'t initialize winsocks\n");
 		return qfalse;
 	}
 #endif
@@ -311,7 +310,7 @@ static qboolean UnsecureInit(void)
 		itf = gethostbyname(listen_name);
 		if(itf == NULL)
 		{
-			MsgPrint(MSG_ERROR, "ERROR: can't resolve %s \n", listen_name);
+			MsgPrint(MSG_ERROR, "ERROR: can\'t resolve %s \n", listen_name);
 			return qfalse;
 		}
 		if(itf->h_addrtype != AF_INET)
@@ -355,7 +354,7 @@ static qboolean SecInit(void)
 		pw = getpwnam(low_priv_user);
 		if(pw == NULL)
 		{
-			MsgPrint(MSG_ERROR, "ERROR: can't get user \"%s\" properties\n", low_priv_user);
+			MsgPrint(MSG_ERROR, "ERROR: can\'t get user \"%s\" properties\n", low_priv_user);
 			return qfalse;
 		}
 
@@ -726,7 +725,7 @@ static qboolean SecureInit(void)
 	}
 	MsgPrint(MSG_NORMAL, "Listening   TCP port %hu -=(  Gamespy  )=- \n", ntohs(address.sin_port));
 
-	if (listen(inSock_tcp, 10) == SOCKET_ERROR) {//hypo todo: test. is 10 enough?
+	if (listen(inSock_tcp, MAX_CLIENTS*2) == SOCKET_ERROR) {//hypo todo: test. is 16 enough?
 		MsgPrint(MSG_ERROR, "listen(): Error listening on socket (%s). \n", strerror(errno));
 		SocketError_close(inSock_tcp, 0, 0);
 		return qfalse;
@@ -771,7 +770,7 @@ static qboolean SecureInit(void)
 	}
 
 	MsgPrint(MSG_NORMAL, "-==========================================-\n");
-	MsgPrint(MSG_NORMAL, "listen() is OK, I'm waiting for connections...\n");
+	MsgPrint(MSG_NORMAL, "listen() is OK, I\'m waiting for connections...\n");
 
 
 	//hypo console colors
@@ -1326,9 +1325,14 @@ sv_memCheck("load offline");
 #ifdef _DEBUG
 sv_memCheck("ping1");
 #endif
-		for ( i = 0; i < numOfflineList; i++ )
+		if (numOfflineList)
 		{
-			Sv_PingOfflineList(offlineList_ptr[ i ].address, offlineList_ptr[ i ].port, qfalse);
+			MsgPrint(MSG_NORMAL, "OFFLINE-LIST: Sending \'yyyystatus\' to %3d servers\n", numOfflineList);
+
+			for ( i = 0; i < numOfflineList; i++ )
+			{
+				Sv_PingOfflineList(offlineList_ptr[ i ].address, offlineList_ptr[ i ].port, qfalse);
+			}
 		}
 #ifdef _DEBUG
 sv_memCheck("ping2");
@@ -1387,7 +1391,7 @@ static void MAST_Check_WebList(qboolean isGS)
 		if ( webSock_tcp[ i ] != INVALID_SOCKET )
 		{
 			if (shutdown(webSock_tcp[i], TCP_SHUTBOTH) == SOCKET_ERROR)
-				MsgPrint(MSG_WARNING, "WARNING: WEBLIST 'shutdown' Failed. (Error: %d)\n", ERRORNUM);
+				MsgPrint(MSG_WARNING, "WARNING: WEBLIST \'shutdown\' Failed. (Error: %d)\n", ERRORNUM);
 			SocketError_close(webSock_tcp[ i ], SOCKET_WEB, i);
 		}
 	}
@@ -1451,7 +1455,7 @@ static void MAST_Check_WebList(qboolean isGS)
 					continue;
 				}
 
-				MsgPrint(MSG_DEBUG, "WEBLIST: 'send' completed ok. ( %s index: %i )\n", webListFileNameString, i + 1);
+				MsgPrint(MSG_DEBUG, "WEBLIST: \'send\' completed ok. ( %s index: %i )\n", webListFileNameString, i + 1);
 			}
 		}
 	}
@@ -1488,7 +1492,7 @@ static void MAST_WebList_Responce(int recieveSock)
 			MsgPrint(MSG_DEBUG, "WEBLIST: Bytes received: %d\n", iResult);
 		}
 		else if (iResult == SOCKET_ERROR){
-			MsgPrint(MSG_WARNING, "WARNING: WEBLIST 'recv' Failed. (Error: %d)\n", ERRORNUM);
+			MsgPrint(MSG_WARNING, "WARNING: WEBLIST \'recv\' Failed. (Error: %d)\n", ERRORNUM);
 			break;
 		}
 
@@ -1509,7 +1513,7 @@ static void MAST_WebList_Responce(int recieveSock)
 
 	// shutdown the connection since no more data will be sent
 	if (shutdown(webSock_tcp[recieveSock], TCP_SHUTBOTH) == SOCKET_ERROR){
-		MsgPrint(MSG_WARNING, "WARNING: WEBLIST 'shutdown' Failed. (Error: %d)\n", ERRORNUM);
+		MsgPrint(MSG_WARNING, "WARNING: WEBLIST \'shutdown\' Failed. (Error: %d)\n", ERRORNUM);
 		SocketError_close(webSock_tcp[recieveSock], SOCKET_WEB, recieveSock);
 		//return;
 	}
@@ -1526,9 +1530,9 @@ static void MAST_WebList_Responce(int recieveSock)
 		if (numwebList)
 		{
 			if ( isWebGSPort )
-				MsgPrint(MSG_NORMAL, "WEBLIST: Sending '\\status\\' to %d servers\n", numwebList);
+				MsgPrint(MSG_NORMAL, "WEB-LIST-GS:  Sending \'\\\\status\\\\\' to %3d servers\n", numwebList);
 			else
-				MsgPrint(MSG_NORMAL, "WEBLIST: Sending 'yyyystatus' to %d servers\n", numwebList);
+				MsgPrint(MSG_NORMAL, "WEB-LIST-GP:  Sending \'yyyystatus\' to %3d servers\n", numwebList);
 
 			for ( i = 0; i < numwebList; i++ )
 			{
@@ -1569,7 +1573,7 @@ qboolean MAST_parseIPConversionFile(void)
 	f = fopen(ipConvertFile_Name, "r");
 	if (!f)
 	{
-		MsgPrint(MSG_WARNING, "WARNING: Cound not open 'ip_rename.txt' \n");
+		MsgPrint(MSG_WARNING, "WARNING: Could not open \'ip_rename.txt\' \n");
 		return qfalse;
 	}
 
@@ -1694,11 +1698,7 @@ sv_memCheck("1");
 		ping_timoutSV_time = crt_time + 20; //check every 20 secs
 	}
 
-#ifdef _DEBUG
-sv_memCheck("2");
-	MAST_Check_OfflineList();
-sv_memCheck("3");
-#endif
+
 	//get servers from txt files
 	if (ping_list_time < crt_time)
 	{
@@ -1761,7 +1761,7 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
 		SV_ClearMem( );
 		if ( ignoreAddresses != NULL )
 			free(ignoreAddresses);
-        return TRUE;
+        return FALSE;
 
     default:
         return FALSE;
@@ -1899,7 +1899,7 @@ int main(int argc, const char *argv[])
 		if (iSendResult <= 0)
 		{
 			if (iSendResult < 0)
-				MsgPrint(MSG_WARNING, "WARNING: TCP 'select' socket Failed. (Error: %d) \n", ERRORNUM);
+				MsgPrint(MSG_WARNING, "WARNING: TCP \'select\' socket Failed. (Error: %d) \n", ERRORNUM);
 
 			//run event's when there is nothing else to do
 			MAST_GlobalTimedEvent();
@@ -1995,7 +1995,7 @@ int main(int argc, const char *argv[])
 			if ( i >= MAX_CLIENTS )	{
 				MsgPrint(MSG_WARNING, "WARNING. Client ports full. clearnig...\n");
 				if (shutdown(clientinfo_tcp[cliID].socknum, TCP_SHUTBOTH) == SOCKET_ERROR)
-					MsgPrint(MSG_WARNING, "WARNING: TCP 'shutdown' Failed. (Error: %i)", ERRORNUM);
+					MsgPrint(MSG_WARNING, "WARNING: TCP \'shutdown\' Failed. (Error: %i)", ERRORNUM);
 				SocketError_close(clientinfo_tcp[cliID].socknum, SOCKET_CLIENT, cliID);
 			}
 
@@ -2013,7 +2013,7 @@ int main(int argc, const char *argv[])
 				snprintf(tmpIP, sizeof(tmpIP), "%s:%hu", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
 				MsgPrint(MSG_WARNING, "%-21s ---> CLIENT: in ignore list \n", tmpIP);
 				if (shutdown(clientinfo_tcp[cliID].socknum, TCP_SHUTBOTH) == SOCKET_ERROR)
-					MsgPrint(MSG_WARNING, "WARNING: TCP 'shutdown' Failed. (Error: %i)", ERRORNUM);
+					MsgPrint(MSG_WARNING, "WARNING: TCP \'shutdown\' Failed. (Error: %i)", ERRORNUM);
 				SocketError_close(clientinfo_tcp[cliID].socknum, SOCKET_CLIENT, cliID);
 				continue;
 			}
@@ -2023,7 +2023,7 @@ int main(int argc, const char *argv[])
 				snprintf(tmpIP, sizeof(tmpIP), "%s:%hu", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
 				MsgPrint(MSG_WARNING, "%-21s ---> FLOOD: Client Rejected\n", tmpIP);
 				if (shutdown(clientinfo_tcp[cliID].socknum, TCP_SHUTBOTH) == SOCKET_ERROR)
-					MsgPrint(MSG_WARNING, "WARNING: TCP 'shutdown' Failed. (Error: %i)", ERRORNUM);
+					MsgPrint(MSG_WARNING, "WARNING: TCP \'shutdown\' Failed. (Error: %i)", ERRORNUM);
 				SocketError_close(clientinfo_tcp[cliID].socknum, SOCKET_CLIENT, cliID);
 				continue;
 			}
@@ -2057,14 +2057,14 @@ int main(int argc, const char *argv[])
 			nb_bytes = recv(clientinfo_tcp[sockCliNum].socknum, packet, MAX_PACKET_SIZE_RECV, 0);
 
 			if (nb_bytes == SOCKET_ERROR) {
-				MsgPrint(MSG_WARNING, "WARNING: TCP 'recv' Failed. (Error: %i)\n", ERRORNUM);
+				MsgPrint(MSG_WARNING, "WARNING: TCP \'recv\' Failed. (Error: %i)\n", ERRORNUM);
 				SocketError_close(clientinfo_tcp[sockCliNum].socknum, SOCKET_CLIENT, sockCliNum);
 				continue;
 			}
 
 			if (!nb_bytes){
 				if (shutdown(clientinfo_tcp[sockCliNum].socknum, TCP_SHUTBOTH) == SOCKET_ERROR)
-					MsgPrint(MSG_WARNING, "WARNING: TCP 'shutdown Failed. (Error: %i)\n", ERRORNUM);
+					MsgPrint(MSG_WARNING, "WARNING: TCP \'shutdown\' Failed. (Error: %i)\n", ERRORNUM);
 				SocketError_close(clientinfo_tcp[sockCliNum].socknum, SOCKET_CLIENT, sockCliNum);
 				continue;
 			}
@@ -2089,12 +2089,12 @@ int main(int argc, const char *argv[])
 				if (max_msg_level >= MSG_DEBUG || netfail != 10054)
 				{
 					snprintf(tmpIP, sizeof(tmpIP), "%s:%hu", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
-					MsgPrint(MSG_WARNING, "%-21s ---> %-22s error:%i\n", tmpIP, "WARNING: 'recvfrom'", netfail);
+					MsgPrint(MSG_WARNING, "%-21s ---> %-22s error:%i\n", tmpIP, "WARNING: \'recvfrom\'", netfail);
 				}
 				else
 				{
 					snprintf(tmpIP, sizeof(tmpIP), "%s:%hu", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
-					MsgPrint(MSG_NORMAL, "%-21s ---> %-22s error:%i\n", tmpIP, "Server rejected 'ping'", netfail);
+					MsgPrint(MSG_NORMAL, "%-21s ---> %-22s error:%i\n", tmpIP, "Server rejected \'ping\'", netfail);
 				}
 
 				continue;
@@ -2139,9 +2139,9 @@ int main(int argc, const char *argv[])
 		if(max_msg_level >= MSG_DEBUG)
 		{
 			MsgPrint(MSG_DEBUG, "%-21s ---> %-22s @%lld \n", peer_address, "New packet received", crt_time);
-			MsgPrint(MSG_DEBUG, "=================================================\n", peer_address);
+			MsgPrint(MSG_DEBUG, "=================================================\n");
 			PrintPacket(packet, nb_bytes);
-			MsgPrint(MSG_DEBUG, "=================================================\n\n", peer_address);
+			MsgPrint(MSG_DEBUG, "=================================================\n\n");
 		}
 
 		// A few sanity checks
@@ -2173,7 +2173,7 @@ int main(int argc, const char *argv[])
 			{
 				/* shutdown the connection since we're done */
 				if (shutdown(clientinfo_tcp[sockCliNum].socknum, TCP_SHUTBOTH) == SOCKET_ERROR)
-					MsgPrint(MSG_WARNING, "WARNING: TCP 'shutdown' Failed. (Error: %i)", ERRORNUM);
+					MsgPrint(MSG_WARNING, "WARNING: TCP \'shutdown\' Failed. (Error: %i)", ERRORNUM);
 
 				/* close client temporary socket */
 				SocketError_close(clientinfo_tcp[sockCliNum].socknum, SOCKET_CLIENT, sockCliNum);
