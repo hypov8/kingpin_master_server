@@ -107,7 +107,8 @@
 
 //gamebrowser to master
 #define B2M_GETSERVERS_LIST			"\\list\\"
-#define B2M_GETSERVERS_QUERY		YYYY"query" //udp //hypov8 added YYYY. check other q2 browsers are ok still
+#define B2M_GETSERVERS_QUERY_YYYY	YYYY"query" //added YYYY for ingame browser support
+#define B2M_GETSERVERS_QUERY		"query" //some gamebrowsers.exe use this standard
 
 //master to client. ingame browser
 #define M2C_GETSERVERSREPONSE_Q2	YYYY"servers\n" // "servers (6 bytes)(6 bytes)" //hypov8 add \n todo check q2 browsers
