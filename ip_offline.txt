@@ -2,7 +2,6 @@
 //
 //121.210.38.89:31510
 //kp.servegame.com:31510
-//kp.servegame.com:31511
 //kp.servegame.com:31512
 //kp.servegame.com:31515
 //kp.servegame.com:31519

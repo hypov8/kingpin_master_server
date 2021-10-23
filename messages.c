@@ -454,29 +454,6 @@ static void MSG_RespondToGetServers_GSpyTCP(const struct sockaddr_in *addr, int 
 			packetind = 0;
 		}
 
-		print_sv_addr = inet_ntoa(sv->address.sin_addr);
-		sv_port = ntohs(sv->address.sin_port);
-		sv_addr = ntohl(sv->address.sin_addr.s_addr);
-		// Use the address mapping associated with the server, if any
-		if (sv->addressReMap != NULL)
-		{
-			const addrmap_t *addrmap = sv->addressReMap;
-			print_sv_addr = inet_ntoa(addrmap->to.sin_addr);
-
-			sv_addr = ntohl(addrmap->to.sin_addr.s_addr);
-			if (addrmap->to.sin_port != 0)
-				sv_port = ntohs(addrmap->to.sin_port);
-		}
-
-		// Extra debugging info
-		if (max_msg_level >= MSG_DEBUG)
-		{
-			MsgPrint(MSG_DEBUG,
-				"Comparing server: IP:\"%u.%u.%u.%u:%hu\", proto:%u, client:%hu\n",
-				(int)(sv_addr >> 24), ((sv_addr >> 16) & 0xFF),
-				((sv_addr >> 8) & 0xFF), (sv_addr & 0xFF), sv_port, sv->protocol, sv->nbclients);
-		}
-
 		// Check protocol, options
 		isKingpin = qfalse;
 
@@ -502,6 +479,35 @@ static void MSG_RespondToGetServers_GSpyTCP(const struct sockaddr_in *addr, int 
 			continue;
 
 
+		print_sv_addr = inet_ntoa(sv->address.sin_addr);
+
+		sv_addr = ntohl(sv->address.sin_addr.s_addr);
+		if (isKingpin)
+			sv_port = sv->gsPort; //-10 send gamespy query port to clients (gslist/gspylite)
+		else
+			sv_port = ntohs(sv->address.sin_port);
+
+		// Use the address mapping associated with the server, if any
+		if (sv->addressReMap != NULL)
+		{
+			const addrmap_t *addrmap = sv->addressReMap;
+			print_sv_addr = inet_ntoa(addrmap->to.sin_addr);
+
+			sv_addr = ntohl(addrmap->to.sin_addr.s_addr);
+			if (addrmap->to.sin_port != 0)
+				sv_port = ntohs(addrmap->to.sin_port);
+		}
+
+		// Extra debugging info
+		if (max_msg_level >= MSG_DEBUG)
+		{
+			MsgPrint(MSG_DEBUG,
+				"Comparing server: IP:\"%u.%u.%u.%u:%hu\", proto:%u, client:%hu\n",
+				(int)(sv_addr >> 24), ((sv_addr >> 16) & 0xFF),
+				((sv_addr >> 8) & 0xFF), (sv_addr & 0xFF), sv_port, sv->protocol, sv->nbclients);
+		}
+
+
 		if (gsEncType >= 0) //gslist. send as byte
 		{
 			// IP address
@@ -514,19 +520,15 @@ static void MSG_RespondToGetServers_GSpyTCP(const struct sockaddr_in *addr, int 
 			packet[packetind + 4] = sv_port >> 8;
 			packet[packetind + 5] = sv_port & 0xFF;
 			packetind += 6;
-
+			// add server to printed debug packet
 			sprintf(printStr, "%s/ip/%s:%hu", printStr, print_sv_addr, sv_port);
 		}
-		else
+		else //gsEncType -1 (gspylite)
 		{
-			if( isKingpin)
-				sprintf(tmp_packet, "\\ip\\%s:%i", print_sv_addr, sv->gsPort); //-10 send gamespy query port to clients
-			else
-				sprintf(tmp_packet, "\\ip\\%s:%i", print_sv_addr, sv_port);
-
+			sprintf(tmp_packet, "\\ip\\%s:%i", print_sv_addr, sv_port);
 			strcat(packet, tmp_packet);
 			packetind += strlen(tmp_packet);
-
+			// add server to printed debug packet
 			sprintf(printStr, "%s/ip/%s:%hu", printStr, print_sv_addr, sv_port);
 		}
 		numServers++;
@@ -1290,6 +1292,12 @@ void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, S
 		//MSG_RespondToGetMotd_KP1(msg + strlen(C2M_GETMOTD), address, recv_sock);
 	}
 //GP.. YYYYquery. Quake2 master query.	
+	else if (!strncmp(B2M_GETSERVERS_QUERY_YYYY, msg, strlen(B2M_GETSERVERS_QUERY_YYYY)))
+	{
+		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s Request quake server packet \n", peer_address, "\'YYYYquery..\'");
+		MSG_RespondToGetServers_Quake(address, recv_sock);
+	}
+//GP.. query. Quake2 master query.	
 	else if (!strncmp(B2M_GETSERVERS_QUERY, msg, strlen(B2M_GETSERVERS_QUERY)))
 	{
 		MsgPrint(MSG_DEBUG, "%-21s ---> %-22s Request quake server packet \n", peer_address, "\'query..\'");

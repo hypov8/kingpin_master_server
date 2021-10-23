@@ -121,10 +121,6 @@ qboolean Sv_ResolveAddr(const char *name, struct sockaddr_in *addr)
 	char           /**namecpy,*/ *port;
 	static char namecpy[ 256 ];
 	struct hostent *host = NULL;
-#ifdef _DEBUG
-	int i, dotCount=0, name_isDNS = qfalse;
-	unsigned long ulAddr = INADDR_NONE;
-#endif
 	strcpy(namecpy, name);
 
 	// Find the port in the address
@@ -132,78 +128,41 @@ qboolean Sv_ResolveAddr(const char *name, struct sockaddr_in *addr)
 	if(port != NULL)
 		*port++ = '\0';
 
-#ifdef _DEBUG
-	//check if string is ipv4 or dns
-	for ( i = 0; i < (int)strlen(namecpy); i++ )
-	{
-		if ( namecpy[ i ] == '.' )
-			dotCount += 1;
 
-		if ( isalpha(namecpy[ i ]) )
-		{
-			name_isDNS = qtrue;
-			break;
-		}
+	//getaddrinfo(namecpy,port, ) //todo:
+	host = gethostbyname(namecpy); //using additional memory..
+
+	if(host == NULL)
+	{
+		MsgPrint(MSG_ERROR, "ERROR: Can\'t resolve %s\n", namecpy);
+		return qfalse;
+	}
+	if(host->h_addrtype != AF_INET)
+	{
+		MsgPrint(MSG_ERROR, "ERROR: %s is not an IPv4 address\n", namecpy);
+		return qfalse;
 	}
 
-	// Resolve the address
-	if ( !name_isDNS )
+	// 0.0.0.0 addresses are forbidden
+		if ((ntohl(*(u_long*)host->h_addr) >> 0) == 0 &&	 (ntohl(*(u_long*)host->h_addr) >> 8) == 0 &&
+			(ntohl(*(u_long*)host->h_addr) >> 16) == 0 && (ntohl(*(u_long*)host->h_addr) >> 24) == 0 )
 	{
-		ulAddr = inet_addr(namecpy);
-		if(ulAddr == INADDR_NONE)
-		{
-			MsgPrint(MSG_ERROR, "ERROR: can\'t resolve %s\n", namecpy);
-			//free(namecpy);
-			return qfalse;
-		}
-
-		// Build the structure
-		memset(addr, 0, sizeof(*addr));
-		addr->sin_family = AF_INET;
-		addr->sin_addr.s_addr = ulAddr;
+		MsgPrint(MSG_ERROR, "ERROR: Mapping from or to 0.0.0.0 is forbidden\n");
+		return qfalse;
 	}
-	else
-#endif
+
+	// Do NOT allow mapping to loopback addresses
+		if ((ntohl(*(u_long*)host->h_addr) >> 24) == 127)
 	{
-#ifdef _DEBUG
-sv_memCheck("__host1");
-#endif
-		//getaddrinfo(namecpy,port, )
-		host = gethostbyname(namecpy); //using additional memory..
-#ifdef _DEBUG
-sv_memCheck("__host2");
-#endif
-		if(host == NULL)
-		{
-			MsgPrint(MSG_ERROR, "ERROR: Can\'t resolve %s\n", namecpy);
-			return qfalse;
-		}
-		if(host->h_addrtype != AF_INET)
-		{
-			MsgPrint(MSG_ERROR, "ERROR: %s is not an IPv4 address\n", namecpy);
-			return qfalse;
-		}
-
-		// 0.0.0.0 addresses are forbidden
-		 if ((ntohl(*(u_long*)host->h_addr) >> 0) == 0 &&	 (ntohl(*(u_long*)host->h_addr) >> 8) == 0 &&
-			 (ntohl(*(u_long*)host->h_addr) >> 16) == 0 && (ntohl(*(u_long*)host->h_addr) >> 24) == 0 )
-		{
-			MsgPrint(MSG_ERROR, "ERROR: Mapping from or to 0.0.0.0 is forbidden\n");
-			return qfalse;
-		}
-
-		// Do NOT allow mapping to loopback addresses
-		 if ((ntohl(*(u_long*)host->h_addr) >> 24) == 127)
-		{
-			MsgPrint(MSG_ERROR, "ERROR: Mapping to a loopback address is forbidden\n");
-			return qfalse;
-		}
-
-		// Build the structure
-		memset(addr, 0, sizeof(*addr));
-		addr->sin_family = AF_INET;
-		memcpy(&addr->sin_addr.s_addr, host->h_addr, sizeof(addr->sin_addr.s_addr));
+		MsgPrint(MSG_ERROR, "ERROR: Mapping to a loopback address is forbidden\n");
+		return qfalse;
 	}
+
+	// Build the structure
+	memset(addr, 0, sizeof(*addr));
+	addr->sin_family = AF_INET;
+	memcpy(&addr->sin_addr.s_addr, host->h_addr, sizeof(addr->sin_addr.s_addr));
+
 
 	//ip
 	if ( port != NULL )
@@ -568,16 +527,12 @@ void Sv_PingOfflineList(char *ip, char *port, qboolean isGSpy)
 		strcpy(packet, M2S_GETSTATUS_GS);
 	else
 		strcpy(packet, M2S_GETSTATUS_YYYY);
-#ifdef _DEBUG
-sv_memCheck("__res1");
-#endif
+
 	memset(&tmpServerAddress, 0, sizeof(tmpServerAddress));
 
 	if (!Sv_ResolveAddr(ip, &tmpServerAddress))
 		return;
-#ifdef _DEBUG
-sv_memCheck("__res2");
-#endif
+
 	tmpServerAddress.sin_port = htons((u_short)atoi(port));
 
 	if (!tmpServerAddress.sin_port){
