@@ -28,11 +28,11 @@
 typedef struct clientTemp2_s
 {
 	SOCKET_NET socknum;
-	time_t timeout;				//forget client
-	qboolean valid;				//good to go. decrypted ok
-	int gsEncType;				//encryption type 0, 1 or 2 (0 is byte compressed, no excryption)
-	char browser_type[64];		//gamespy, kingpin, quake2
-	char decrypt_str[64];		//"mgNUaC"
+	time_t timeout;        //forget client
+	qboolean valid;        //good to go. decrypted ok
+	int gsEncType;         //encryption type 0, 1 or 2 (0 is byte compressed, no excryption)
+	char browser_type[64]; //gamespy, kingpin, quake2
+	char decrypt_str[64];  //"mgNUaC"
 	struct sockaddr_in tmpClientAddress ;
 }clientTemp2_t;
 
@@ -42,8 +42,8 @@ clientTemp2_t clientinfo_tcp[MAX_CLIENTS];
 // ---------- Public functions ---------- //
 
 // Parse a packet to figure out what to do with it
-void	MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, SOCKET_NET recv_sock, int nb_bytes);
-int		MSG_HandleMessage_GspyTCP(const char *msg, const struct sockaddr_in *address, int clientID);
-void	MSG_HandleMessage_KPQ3(const char *msg, const struct sockaddr_in *address, SOCKET_NET recv_sock);
+void MSG_HandleMessage_KP1(const char *msg, const struct sockaddr_in *address, SOCKET_NET recv_sock, int nb_bytes);
+int  MSG_HandleMessage_GspyTCP(const char *msg, const struct sockaddr_in *address, int clientID);
+void MSG_HandleMessage_KPQ3(const char *msg, const struct sockaddr_in *address, SOCKET_NET recv_sock);
 
 #endif							// _MESSAGES_H_

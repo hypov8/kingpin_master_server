@@ -457,6 +457,8 @@ void Sv_PingTimeOut_GamePort(void)
 	unsigned long	sv_addr;
 	char			*char_sv_addr;
 	unsigned short  sv_port;
+	SOCKET_NET snd_sock_kp = (outSock_udp != INVALID_SOCKET) ? outSock_udp : inSock_udp;
+	SOCKET_NET snd_sock_kpq3 = (outSock_kpq3 != INVALID_SOCKET) ? outSock_kpq3 : inSock_kpq3;
 
 	// ping every relevant server
 	for (sv = Sv_GetFirst(); /* see below */; sv = Sv_GetNext())
@@ -477,23 +479,15 @@ void Sv_PingTimeOut_GamePort(void)
 
 		if ( sv->protocol == 32 || sv->protocol == 34 )
 		{
-#ifdef USE_ALT_OUTPORT
-			sendto(outSock_udp, M2S_PING_YYYY, strlen(M2S_PING_YYYY), 0,
+			sendto( snd_sock_kp /*#ifdef USE_ALT_OUTPORT	 outSock_udp #else inSock_udp #endif*/
+			, M2S_PING_YYYY, strlen(M2S_PING_YYYY), 0,
 				(const struct sockaddr *)&sv->address, sizeof(sv->address));
-#else
-			sendto(inSock_udp, M2S_PING_YYYY, strlen(M2S_PING_YYYY), 0,
-				( const struct sockaddr * )&sv->address, sizeof(sv->address));
-#endif
 		}
 		else if ( ( sv->protocol == 74 || sv->protocol == 75 ) )
 		{
-#ifdef USE_ALT_OUTPORT
-			sendto(outSock_kpq3, M2S_GETINFO_KPQ3, strlen(M2S_GETINFO_KPQ3), 0,
-				(const struct sockaddr *)&sv->address, sizeof(sv->address));
-#else
-			sendto(inSock_kpq3, M2S_GETINFO_KPQ3, strlen(M2S_GETINFO_KPQ3), 0,
-				( const struct sockaddr * )&sv->address, sizeof(sv->address));
-#endif
+			sendto( snd_sock_kpq3 /*#ifdef USE_ALT_OUTPORT outSock_kpq3 #else inSock_kpq3 #endif*/
+			, M2S_GETINFO_KPQ3, strlen(M2S_GETINFO_KPQ3), 0,
+				( const struct sockaddr *)&sv->address, sizeof(sv->address));
 		}
 		else
 			continue;
@@ -521,6 +515,7 @@ void Sv_PingOfflineList(char *ip, char *port, qboolean isGSpy)
 	server_t			*sv;
 	char tmpIP[128];
 	int nb_bytes;
+	SOCKET_NET snd_sock = (outSock_udp != INVALID_SOCKET) ? outSock_udp : inSock_udp;
 
 	memset(packet, 0, sizeof(packet));
 	if (isGSpy)
@@ -597,20 +592,17 @@ void Sv_PingOfflineList(char *ip, char *port, qboolean isGSpy)
 sv_memCheck("__ping1");
 #endif
 	// ping offline servers not in master
-#ifdef USE_ALT_OUTPORT
-	nb_bytes = sendto(outSock_udp, packet, strlen(packet), 0,
-		(const struct sockaddr *)&tmpServerAddress, sizeof(tmpServerAddress));
-#else
-	nb_bytes= sendto(inSock_udp, packet, strlen(packet), 0,
-		(const struct sockaddr *)&tmpServerAddress, sizeof(tmpServerAddress));
-	
+
+	nb_bytes = sendto(snd_sock/*#ifdef USE_ALT_OUTPORT outSock_udp #else	 inSock_udp #endif*/		
+	, packet, strlen(packet), 0, (const struct sockaddr *)&tmpServerAddress, sizeof(tmpServerAddress));
+
 	if (nb_bytes == SOCKET_ERROR){
 		snprintf(tmpIP, sizeof(tmpIP), "%s:%S", ip, port);
 		MsgPrint(MSG_WARNING, "%-21s ---> %-22s error:%i\n",
 			tmpIP, "WARNING: \'sendto\' offlineList\n", ERRORNUM);
 	}
 
-#endif
+
 #ifdef _DEBUG
 sv_memCheck("__ping2");
 #endif
@@ -710,7 +702,9 @@ server_t       *Sv_GetByAddr(const struct sockaddr_in *address, qboolean add_it)
 
 	MsgPrint(MSG_NORMAL, "%-21s ---+ %-22s Stored (total: %u)\n",
 		peer_address, "New server", nb_servers);
-	MsgPrint(MSG_DEBUG, "  - index: %u\n" "  - hash: 0x%02X\n",
+	MsgPrint(MSG_DEBUG, 
+		"  - index: %u\n"
+		"  - hash: 0x%02X\n",
 		last_alloc, hash);
 
 	return sv;

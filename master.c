@@ -38,22 +38,22 @@
 // ---------- Constants ---------- //
 
 // Version of dpmaster
-#define VERSION "1.6.11" //hypov8 version
+#define VERSION "1.6.14" //hypov8 version
 
 // Default master port
-#define DEFAULT_MASTER_PORT 27900 //27900 hypo kingpin
-#define DEFAULT_MASTER_PORT_KPQ3 27950 //kpq3 master port
+#define DEFAULT_MASTER_PORT         27900 //27900 hypo kingpin
+#define DEFAULT_MASTER_PORT_KPQ3    27950 //kpq3 master port
 #define DEFAULT_MASTER_PORT_GAMESPY 28900 //GameSpy master port
 
 // Maximum and minimum sizes for a valid packet
-#define MIN_PACKET_SIZE 5
-#define MAX_PACKET_SIZE_RECV 4096	//hypo ToDo: should we need to check for split packets? gamespy?
-									//should not be recieving full server info. 
+#define MIN_PACKET_SIZE 3 // was 5
+#define MAX_PACKET_SIZE_RECV 4096   //hypo ToDo: should we need to check for split packets? gamespy?
+                                    //should not be recieving full server info. 
 
 // web list
-#define MAX_WEBLIST	3
-#define REFRESH_TIME_WEBLIST	300
-#define REFRESH_TIME_DNS		300
+#define MAX_WEBLIST          3
+#define REFRESH_TIME_WEBLIST	 300
+#define REFRESH_TIME_DNS	     300
 
 #ifndef WIN32
 // Default path we use for chroot
@@ -98,26 +98,26 @@ static const char *low_priv_user = DEFAULT_LOW_PRIV_USER;
 // ---------- Public variables ---------- //
 
 // The master socket
-SOCKET_NET		inSock_udp = INVALID_SOCKET; // listen kp port
-SOCKET_NET		inSock_kpq3 = INVALID_SOCKET; //listen kpq3 port
-#ifdef USE_ALT_OUTPORT
-SOCKET_NET		outSock_udp		 = INVALID_SOCKET; // out kp
-SOCKET_NET		outSock_kpq3	 = INVALID_SOCKET; // out kpq3
-#endif
-SOCKET_NET		inSock_tcp = INVALID_SOCKET; // in tcp
+SOCKET_NET		inSock_udp =   INVALID_SOCKET; // listen kp port
+SOCKET_NET		inSock_kpq3 =  INVALID_SOCKET; //listen kpq3 port
+//#ifdef USE_ALT_OUTPORT
+SOCKET_NET		outSock_udp =  INVALID_SOCKET; // out kp
+SOCKET_NET		outSock_kpq3 = INVALID_SOCKET; // out kpq3
+//#endif
+SOCKET_NET		inSock_tcp =   INVALID_SOCKET; // in tcp
 SOCKET_NET		webSock_tcp[MAX_WEBLIST];
 
-#define SOCKET_CLIENT	1
-#define SOCKET_WEB		2
+#define SOCKET_CLIENT   1
+#define SOCKET_WEB      2
 
 // The current time (updated every time we receive a packet)
 time_t          crt_time;
 
 //offline/web lists
 static qboolean isWebGSPort; //tell web in-sockets to use gamespy or Game protocol
-static time_t	ping_dns_time = 0; //add hypo refresh dns
-static time_t	ping_timoutSV_time = 0; //add hypo get server updates
-static time_t	ping_list_time = 0; // ping offline/web list
+static time_t   ping_dns_time = 0; //add hypo refresh dns
+static time_t   ping_timoutSV_time = 0; //add hypo get server updates
+static time_t   ping_list_time = 0; // ping offline/web list
 
 
 //static ip switch
@@ -147,28 +147,42 @@ Print the contents of a packet on stdout
 */
 static void PrintPacket(const char *packet, size_t length)
 {
-	size_t          i;
+	size_t i;
+	int    j;
+	char   pket[MAX_PACKET_SIZE_RECV *2];
+	qbyte  c;
+
+	memset(pket, 0, sizeof(pket));
 
 	// Exceptionally, we use MSG_NOPRINT here because if the function is
 	// called, the user probably wants this text to be displayed
 	// whatever the maximum message level is.
-	MsgPrint(MSG_NOPRINT, "\"");
+
+	//MsgPrint(MSG_NOPRINT| MSG_COL_1, "\"");
+	strcpy(pket, "\"");
+	j = 1;
 
 	for(i = 0; i < length; i++)
 	{
-		char            c = packet[i];
+		c = packet[i];
 
-		if(c == '\\')
-			MsgPrint(MSG_NOPRINT, "\\\\");
-		else if(c == '\"')
-			MsgPrint(MSG_NOPRINT, "\"");
-		else if(c >= 32 && (qbyte) c <= 127)
-			MsgPrint(MSG_NOPRINT, "%c", c);
+		/*if (c == '\\')
+		{
+			strcat(pket, "\\\\");//MsgPrint(MSG_NOPRINT | MSG_COL_1, "\\\\");
+			j++;
+		}
+		else*/ if (c < 32 || c > 127)
+		{ //print as hex
+			sprintf(pket, "%s\\x%02hhX", pket, c);//MsgPrint(MSG_NOPRINT, "\\x%02X", c);
+			j += 3;
+		}
 		else
-			MsgPrint(MSG_NOPRINT, "\\x%02X", c);
+			pket[j] = c;//MsgPrint(MSG_NOPRINT, "%c", c);
+		j++;
 	}
-
-	MsgPrint(MSG_NOPRINT, "\" (%u bytes)\n", length);
+	sprintf(pket, "%s\" (%04u bytes)\n", pket, length); 
+	j += 14;
+	MsgPrint(MSG_NOPRINT| MSG_COL_2, "%s", pket);
 }
 
 
@@ -586,6 +600,26 @@ static void PrintHelp(void)
 }
 
 
+void InitSockets(SOCKET *sock, int dGram, int ipProto, char* socName)
+{
+	*sock = socket(PF_INET, dGram, ipProto);
+	if (*sock == INVALID_SOCKET)	{
+		MsgPrint(MSG_ERROR, "ERROR: %s creation failed (%s)\n", socName, strerror(errno));
+	}
+}
+
+void InitBindSockets(struct sockaddr_in address, SOCKET *sock, unsigned short master_port, char * portMsg, char * gameMsg)
+{
+	address.sin_port = htons(master_port);
+	if (bind((*sock), (struct sockaddr *)&address, sizeof(address)) != 0)
+	{
+		MsgPrint(MSG_ERROR, "ERROR: socket binding failed (%s) \n", strerror(errno));
+		SocketError_close(*sock, 0, 0);
+		*sock = INVALID_SOCKET;
+	}
+	MsgPrint(MSG_NORMAL, "%s port %hu -=(  %s  )=- \n", portMsg, ntohs(address.sin_port), gameMsg);
+}
+
 /*
 ====================
 SecureInit
@@ -608,40 +642,9 @@ static qboolean SecureInit(void)
 	MsgPrint(MSG_NORMAL, "-==========================================-\n");
 
 	////////////////////////////////////////////////////////
-	// create sockets.
-	////////////////////////////////////////////////////////
-	/* kp1 */
-	inSock_udp = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if (inSock_udp < 0)	{
-		MsgPrint(MSG_ERROR, "ERROR: inSocket creation failed (%s)\n", strerror(errno));
-		return qfalse;
-	}
-#ifdef USE_ALT_OUTPORT
-	outSock_udp = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if(outSock_udp < 0)	{
-		MsgPrint(MSG_ERROR, "ERROR: outSocket creation failed (%s)\n", strerror(errno));
-		return qfalse;
-	}
-#endif	
-	/* kpq3 */
-	inSock_kpq3 = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if (inSock_kpq3 < 0)	{
-		MsgPrint(MSG_ERROR, "ERROR: inSocket_kpq3 creation failed (%s)\n", strerror(errno));
-		return qfalse;
-	}
-#ifdef USE_ALT_OUTPORT
-	outSock_kpq3 = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if (outSock_kpq3 < 0)	{
-		MsgPrint(MSG_ERROR, "ERROR: outSocket_kpq3 creation failed (%s)\n", strerror(errno));
-		return qfalse;
-	}
-#endif
-	////////////////////////////////////////////////////////
-	//  Bind it to the ports
+	//  set IP address
 	////////////////////////////////////////////////////////
 	memset(&address, 0, sizeof(address));
-
-	/* kp1 */
 	address.sin_family = AF_INET;
 	if(listen_name != NULL)
 	{
@@ -649,92 +652,58 @@ static qboolean SecureInit(void)
 		address.sin_addr.s_addr = listen_addr.s_addr;
 	}
 	else
-		address.sin_addr.s_addr = htonl(INADDR_ANY);
+		address.sin_addr.s_addr = htonl(INADDR_ANY);  //tcp only use any ip?
 
-	address.sin_port = htons(master_port);
-	if (bind(inSock_udp, (struct sockaddr *)&address, sizeof(address)) != 0)
-	{
-		MsgPrint(MSG_ERROR, "ERROR: socket binding failed (%s) \n", strerror(errno));
-		SocketError_close(inSock_udp, 0, 0);
+
+	////////////////////////////////////////////////////////
+	// create sockets.
+	////////////////////////////////////////////////////////
+	InitSockets(&inSock_udp, SOCK_DGRAM, IPPROTO_UDP, "inSock_udp");
+	InitSockets(&inSock_kpq3, SOCK_DGRAM, IPPROTO_UDP, "inSock_kpq3");
+	InitSockets(&inSock_tcp, SOCK_STREAM, IPPROTO_TCP, "inSock_tcp"); //gamespy TCP
+	if (!inSock_udp || !inSock_kpq3 || !inSock_tcp)
 		return qfalse;
-	}
-	MsgPrint(MSG_NORMAL, "Listening   UDP port %hu -=(  Kingpin  )=- \n", ntohs(address.sin_port));
 
-
-	/* KPQ3 */
-	address.sin_port = htons(master_port_kpq3);
-	if (bind(inSock_kpq3, (struct sockaddr *)&address, sizeof(address)) != 0)
-	{
-		MsgPrint(MSG_ERROR, "ERROR: socket binding failed (%s) \n", strerror(errno));
-		SocketError_close(inSock_kpq3, 0, 0);
+#ifdef USE_ALT_OUTPORT
+	InitSockets(&outSock_udp, SOCK_DGRAM, IPPROTO_UDP, "outSock_udp");
+	InitSockets(&outSock_kpq3, SOCK_DGRAM, IPPROTO_UDP, "outSock_kpq3");
+	if (!outSock_udp || !outSock_kpq3)
 		return qfalse;
-	}
-	MsgPrint(MSG_NORMAL, "Listening   UDP port %hu -=( KingpinQ3 )=-\n", ntohs(address.sin_port));
-
-
-#ifdef USE_ALT_OUTPORT //hypo do we need this, may cause issues?
-	// UDP OUT KPQ3
-	// Deliberately use a different port for outgoing traffic in order
-	// to confuse NAT UDP "connection" tracking and thus delist servers
-	// hidden by NAT
-	address.sin_port = htons(master_port_kpq3 + 1);
-	if (bind(outSock_kpq3, (struct sockaddr *)&address, sizeof(address)) != 0)
-	{
-		MsgPrint(MSG_ERROR, "ERROR: socket binding failed (%s)\n", strerror(errno));
-		SocketError_close(outSock_kpq3, 0, 0);
-		return qfalse;
-	}
-	MsgPrint(MSG_NORMAL, "Server out  UDP port %hu -=( KingpinQ3 )=-\n", ntohs(address.sin_port));
-	//END UDP OUT KPQ3
-
-
-	// UDP OUT
-	// Deliberately use a different port for outgoing traffic in order
-	// to confuse NAT UDP "connection" tracking and thus delist servers
-	// hidden by NAT
-	address.sin_port = htons(master_port + 1);
-
-	if(bind(outSock_udp, (struct sockaddr *)&address, sizeof(address)) != 0)	{
-		MsgPrint(MSG_ERROR, "ERROR: socket binding failed (%s)\n", strerror(errno));
-		SocketError_close(outSock_udp, 0, 0);
-		return qfalse;
-	}
-	MsgPrint(MSG_NORMAL, "Server out  UDP port %hu -=(  Kingpin  )=-\n", ntohs(address.sin_port));
-	//END UDP OUT
 #endif
 
-////////////////////////////////////////////////////////
-// listen on TCP for gamespy
-////////////////////////////////////////////////////////
-	inSock_tcp = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP); //hypov8
-	if (inSock_tcp == INVALID_SOCKET)	{
-		MsgPrint(MSG_WARNING, "Server: Error at socket(): (%s)\n", strerror(errno));
-		SocketError_close(inSock_tcp, 0, 0);
+
+	////////////////////////////////////////////////////////
+	//  Bind sockets
+	////////////////////////////////////////////////////////
+	InitBindSockets(address, &inSock_udp, master_port, "Listening   UDP", "Kingpin");
+	InitBindSockets(address, &inSock_kpq3, master_port_kpq3, "Listening   UDP", "KingpinQ3");
+	InitBindSockets(address, &inSock_tcp, master_port_gs, "Listening   TCP", "Gamespy");
+	if (!inSock_udp || !inSock_kpq3 || !inSock_tcp)
 		return qfalse;
-	}
-
-	//sockaddr_in service;
-	address.sin_family = AF_INET;
-	address.sin_addr.s_addr = htonl(INADDR_ANY);
-	address.sin_port = htons(master_port_gs); // master_port + 1000); //hypov8 todo: add startup cmd switch?
-
-	if (bind(inSock_tcp, (struct sockaddr *)&address, sizeof(address)) != 0)	{
-		MsgPrint(MSG_ERROR, "ERROR: socket binding failed (%s) \n", strerror(errno));
-		SocketError_close(inSock_tcp, 0, 0);
+#ifdef USE_ALT_OUTPORT
+	// Deliberately use a different port for outgoing traffic in order
+	// to confuse NAT UDP "connection" tracking and thus delist servers
+	// hidden by NAT
+	InitBindSockets(address, &outSock_udp, master_port+1, "Server out  UDP", "Kingpin");
+	InitBindSockets(address, &outSock_kpq3, master_port_kpq3+1, "Server out  UDP", "KingpinQ3");
+	if (!outSock_udp || !outSock_kpq3)
 		return qfalse;
-	}
-	MsgPrint(MSG_NORMAL, "Listening   TCP port %hu -=(  Gamespy  )=- \n", ntohs(address.sin_port));
+#endif
 
+
+	////////////////////////////////////////////////////////
+	// listen on TCP for gamespy
+	////////////////////////////////////////////////////////
+	//open listen port
 	if (listen(inSock_tcp, MAX_CLIENTS*2) == SOCKET_ERROR) {//hypo todo: test. is 16 enough?
 		MsgPrint(MSG_ERROR, "listen(): Error listening on socket (%s). \n", strerror(errno));
 		SocketError_close(inSock_tcp, 0, 0);
 		return qfalse;
 	}
-///////////////
-//end tcp Gamespy
-///////////////
+	// end tcp Gamespy
+	////////////////////////////////////////////////////////
 
-// increase socket buffer for big web lists
+	// increase socket buffer for big web lists
 	{
 		//getsockopt(inSock_udp, )
 		int iResult = 0;
@@ -753,7 +722,6 @@ static qboolean SecureInit(void)
 			iResult = getsockopt(inSock_udp, SOL_SOCKET, SO_RCVBUF, (char *)&iOptVal, &iOptLen);
 			if (iResult !=SOCKET_ERROR)
 				MsgPrint(MSG_NORMAL, "recv Buf:   %ld \n", iOptVal);
-				
 		}
 
 		iResult = setsockopt(inSock_udp, SOL_SOCKET, SO_SNDBUF, (char *)&bOptVal, bOptLen);
@@ -766,7 +734,6 @@ static qboolean SecureInit(void)
 
 		//iResult = getsockopt(inSock_udp, SOL_SOCKET, SO_RCVBUF, (char *)&iOptVal, &iOptLen);
 		//wprintf(L"SO_KEEPALIVE Value: %ld\n", iOptVal);
-
 	}
 
 	MsgPrint(MSG_NORMAL, "-==========================================-\n");
@@ -798,50 +765,51 @@ static void cleanUp(int signal)
 
 	exitNow = qtrue;
 }
-#define PORT_LENGTH 6
-#define ADDRESS_LENGTH 16
+#define PORT_LENGTH         6
+#define ADDRESS_LENGTH     16
 #define ADDRESS_LENGTHMAX 253 //16+16+1 //hypov8 ip+ip+= //changed.. dns lengths.....
-static const char *ipIgnoreFile_Name =	"ip_ignore.txt";
-static const char *ipConvertFile_Name =	"ip_rename.txt"; //hypov8 ip rename
-static const char *ipOfflineFile_Name =	"ip_offline.txt"; //hypov8 ip rename
+static const char *ipIgnoreFile_Name   = "ip_ignore.txt";
+static const char *ipConvertFile_Name  = "ip_rename.txt"; //hypov8 ip rename
+static const char *ipOfflineFile_Name  = "ip_offline.txt"; //hypov8 ip rename
 static const char *webListFile_gp_Name = "ip_weblist.txt";
 static const char *webListFile_gs_Name = "ip_weblist_gs.txt";
 
 typedef struct
 {
-	char            address[ADDRESS_LENGTH];	// Dotted quad
+	char  address[ADDRESS_LENGTH];	// Dotted quad
 } ignoreAddress_t;
 
 
 typedef struct
 {
-	char            address[ADDRESS_LENGTHMAX];	// hypo dns
-	char			port[PORT_LENGTH];
+	char  address[ADDRESS_LENGTHMAX];	// hypo dns
+	char  port[PORT_LENGTH];
 } offlineList_t;
 
 typedef struct
 {
-	char            address[ADDRESS_LENGTHMAX];	// hypo dns
-	char			port[PORT_LENGTH];
-	char			file[ADDRESS_LENGTHMAX];
+	char      address[ADDRESS_LENGTHMAX];	// hypo dns
+	char      port[PORT_LENGTH];
+	char      file[ADDRESS_LENGTHMAX];
+	qboolean  isHttps;
 } webList_t;
 
 
 #define PARSE_INTERVAL		60	// seconds
 
-static time_t   lastParseTime = 0;
-static int      numIgnoreAddresses = 0;
+static time_t           lastParseTime = 0;
+static int              numIgnoreAddresses = 0;
 static ignoreAddress_t *ignoreAddresses = NULL;
 
 //offline list
-static time_t   lastParseTimeOffline = 0;
-static int      numOfflineList = 0;
+static time_t         lastParseTimeOffline = 0;
+static int            numOfflineList = 0;
 static offlineList_t *offlineList_ptr = NULL;
 
 //web list
 //static int     numwebList = 0; 
 static offlineList_t *webList_ptr = NULL;
-static webList_t	webString[MAX_WEBLIST];
+static webList_t      webString[MAX_WEBLIST];
 
 /*
 ====================
@@ -852,11 +820,11 @@ will always load file when a new ip request
 */
 static qboolean MAST_parseIgnoreAddress(void)
 {
-	int             numAllocIgnoreAddresses = 1;
-	FILE           *f = NULL;
-	int             i;
-	qboolean		skipLine;
-	time_t			timediff;
+	int       numAllocIgnoreAddresses = 1;
+	FILE     *f = NULL;
+	int       i;
+	qboolean  skipLine;
+	time_t    timediff;
 
 	timediff = crt_time - lastParseTime;
 
@@ -983,7 +951,7 @@ hypo offline list to ping
 static qboolean MAST_parseOfflineList(int numAllocOfflineList, int * numOfflineList)
 {
 	FILE		*f = NULL;
-	char		s[ADDRESS_LENGTHMAX];
+	char		*portPtr, j, c, s[ADDRESS_LENGTHMAX], p[PORT_LENGTH];
 
 	MsgPrint(MSG_DEBUG, "Loading... %s\n", ipOfflineFile_Name);
 	f = fopen(ipOfflineFile_Name, "r");
@@ -992,32 +960,31 @@ static qboolean MAST_parseOfflineList(int numAllocOfflineList, int * numOfflineL
 	}
 
 	//loop through each line
-	while (fgets(s, ADDRESS_LENGTHMAX, f) != NULL && !feof(f))
+	while (fgets(s, ADDRESS_LENGTHMAX, f) != NULL)// && !feof(f))
 	{
-		char *port, j;
+		c = s[0];
 
 		// Skip comment lines
-		if (s[0] == '/')
+		if (isspace(c) || c == '/' ||c == '\\' )
 			continue;
 
 		//check for port
-		port = strstr(s, ":");
-		if (port == NULL)	
+		portPtr = strstr(s, ":");
+		if (portPtr == NULL)	
+			continue;	//hypov8 todo error message??
+
+		*portPtr++ = '\0'; //ternimate ip string
+		memset(p, 0, PORT_LENGTH);
+		for (j = 0; j < PORT_LENGTH-1; j++) 
 		{
-			//hypov8 todo error message??
-			continue;
-		}
-		*port++ = '\0';
-		port[7] = '\0';
-		for (j = 0; j < 7; j++) 
-		{
-			if (port[j] == '\n') {
-				port[j] = '\0';
+			c = portPtr[0];
+			if (!c || isspace(c) || c == '/') 
 				break;
-			}
+			p[j] = c;
+			portPtr++;
 		}
 		//copy port and ip
-		strcpy(offlineList_ptr[*numOfflineList].port, port);
+		strcpy(offlineList_ptr[*numOfflineList].port, p);
 		strcpy(offlineList_ptr[*numOfflineList].address, s);
 		*numOfflineList = *numOfflineList + 1;
 
@@ -1037,6 +1004,8 @@ static qboolean MAST_parseOfflineList(int numAllocOfflineList, int * numOfflineL
 				return qfalse;
 			}
 		}
+		if (feof(f))
+			break;
 	}
 
 	fclose(f);
@@ -1047,14 +1016,12 @@ static qboolean MAST_parseOfflineList(int numAllocOfflineList, int * numOfflineL
 
 static qboolean MAST_parseWebListFile(qboolean isGSPorts)//char* webText
 {
-	int		len,count = 0;
-	FILE	*file = NULL;
-	char	*s, line[1024];
-	char	*tmpPort, *tmpFile;
+	int   len,count = 0;
+	FILE *file = NULL;
+	char *s, line[1024];
+	char *tmpIP, *tmpPort, *tmpFile;
 
-	memset(&webString[0], 0, sizeof(webString[0]));
-	memset(&webString[1], 0, sizeof(webString[1]));
-	memset(&webString[2], 0, sizeof(webString[2]));
+	memset(&webString, 0, sizeof(webString));
 
 	if ( isGSPorts ) {
 		MsgPrint(MSG_DEBUG, "Loading... %s\n", webListFile_gs_Name);
@@ -1073,54 +1040,61 @@ static qboolean MAST_parseWebListFile(qboolean isGSPorts)//char* webText
 	{
 		int has_port = 0;
 
-		s = line;
+		s = &line[0];
 		// skip initial white space chars
-		while (*s && isspace(*s))
+		while (s[0] && isspace(s[0]))
 			s++;
 
 		// skip emtpy lines and comments
-		if (!(*s) || *s == '#' || !strncmp(s, "//", 2))
+		if (s[0] == '\0' || s[0] == '#' || !strncmp(s, "//", 2))
 			continue;
 
 		// remove trailing white space chars
 		len = strlen(s);
 		while (len > 0 && isspace(s[len - 1]))
-			s[--len] = '\0';
+			s[--len] = 0;
 
 		//nothing left to read
 		if (!s[0])
 			continue;
 
+		strcpy(webString[count].port, "80");
+		//begin with http?
+		if (x_strnicmp(s, "http://", 7) == 0)
+		{
+			webString[count].isHttps = qfalse;
+			s += 7;
+		}
+		else if (x_strnicmp(s, "https://", 8) == 0)
+		{
+			webString[count].isHttps = qtrue;
+			strcpy(webString[count].port, "443");
+			s += 8;
+		}
+		tmpIP = s;
+
 		//has a port?
 		tmpPort = strstr(s, ":");
 		if (tmpPort != NULL)
 		{
+			unsigned long cnt = tmpPort - s;
+			tmpPort[0] = '\0';
 			tmpPort++;
-			has_port = 1;
+			s = tmpPort;
 		}
 
 		//has a file path
 		tmpFile = strstr(s, "/");
-		if (tmpFile == NULL)
+		if (!tmpFile)
 			continue;
 
-		if (has_port)
-		{
-			int pLen = strlen(tmpPort);
-			int fLen = strlen(tmpFile);
-			int dnsLen = len - pLen-1; //dns address
-			int plen2 = pLen - fLen;
-			snprintf(webString[count].port, plen2, "%s", tmpPort);	
-			snprintf(webString[count].address, dnsLen, "%s", s);
-			snprintf(webString[count].file, fLen, "%s", tmpFile);
-		}
-		else //no port
-		{
-			int fLen = strlen(tmpFile);
-			int dnsLen = len - fLen; //dns address
-			snprintf(webString[count].address, dnsLen, "%s", s);
-			snprintf(webString[count].file, fLen, "%s", tmpFile);
-		}	
+		tmpFile[0] = '\0';
+		tmpFile++;
+
+		if (tmpPort)
+			strcpy(webString[count].port, tmpPort);
+		strcpy(webString[count].address, tmpIP);
+		sprintf(webString[count].file, "/%s", tmpFile);
 		count++;
 	}		
 
@@ -1131,126 +1105,104 @@ static qboolean MAST_parseWebListFile(qboolean isGSPorts)//char* webText
 
 static qboolean MAST_parseWebListIPs(const char* webText, int numAllocWebList, int *numwebList)
 {
-	int             i, j, k;
-	qboolean		Error = 1;
-	char			*split_request;
+	int       i, j, k;
+	char     *tokenPtr = strtok((char*)webText, "\n"); //new line token
+	char      c, bufferIP[ADDRESS_LENGTHMAX], bufferPort[PORT_LENGTH];
+	qboolean  port;
 	
+	if (tokenPtr == NULL)
+		return qfalse;
 
-	split_request = strtok((char*)webText, "\r\n");
-	while (split_request != NULL)
+	//skip header text
+	if (strstr(tokenPtr, "HTTP/") != NULL)
 	{
-		char c;
+		char ok1[20], ok2[20];
+		int result = sscanf(tokenPtr, "%s %s", ok1, ok2 ); //HTTP/1.1 200 OK
+		if (result && ok2[0] != '2')
+			return qfalse; //failed
 
-		c = split_request[0];
-		if (c)
+		while (tokenPtr != NULL)
 		{
-			if (strstr(split_request, "Content-Type: text")!=NULL )
-			{
-				split_request = strtok(NULL, "\r\n");
-				Error = 0;
+			tokenPtr = strtok(NULL, "\n");
+			//find \n\r\n or \n\n
+			if (tokenPtr == NULL || isspace(tokenPtr[0])) 
 				break;
-			}
-			//error
-			if (strstr(split_request, "404 Not Found")!=NULL )
-				break;
+		}
+	}
 
-			split_request = strtok(NULL, "\r\n");
+
+	while (tokenPtr != NULL)
+	{
+		k = 0;
+		c = tokenPtr[0];
+
+		// Skip whitespace
+		if (!c || isspace(c) || c == '\\'||c == '/')
+		{
+			tokenPtr = strtok(NULL, "\n"); //read next token/line
 			continue;
 		}
-		break; //error. end of line
-	}
 
-
-	if (Error)
-	{
-		return qfalse;
-	}
-	else
-	{
-		char            c;
-		char            buffer[ADDRESS_LENGTHMAX];
-		char            bufferPort[PORT_LENGTH];
-		qboolean		port;
-
-		while (split_request != NULL)
+		//start's with a number?
+		if (c < '0' || c > '9')
 		{
-			i = 0;
-			j = 0;
-			k = 0;
+			tokenPtr = strtok(NULL, "\n"); //read next token/line
+			continue;
+		}
 
-			// Skip whitespace
-			c = split_request[i];
-			if (!c || isspace(c) || c == '\\'||c == '/')
+		port = qfalse;
+		for (i = 0; i < ADDRESS_LENGTHMAX; i++)
+		{
+			c = tokenPtr[i];
+			if (isspace(c))	
+				break;
+
+			//end of line
+			if (isspace(c) || c == '\0')
+				break;
+
+			//port
+			if (c == ':')
 			{
-				split_request = strtok(NULL, "\r\n");
-				continue;
-			}
-
-			memset(buffer, 0, sizeof(buffer)); //hypov8 reset buffer length to zero
-			memset(bufferPort, 0, sizeof(bufferPort)); //hypov8 reset buffer length to zero
-			port = qfalse;
-			do
-			{
-				if (i >= ADDRESS_LENGTHMAX)	{
-					buffer[i - 1] = '\0';
-					break;
-				}
-
-				if (c == ':'){
-					buffer[i] = '\0';
-					port = qtrue;
-					i++;
-					continue;
-				}
-
-				if (!port)	{
-					buffer[i] = c;
-
-					if (isspace(c))	{
-						buffer[i] = '\0';
-						break;
-					}
-				}
-				else
+				port = qtrue;
+				for (j = 0; j < PORT_LENGTH; j++)
 				{
-					bufferPort[j] = c;
-
-					if (isspace(c))	{
-						bufferPort[j] = '\0';
+					c = tokenPtr[i + j + 1];
+					if (isspace(c) || c == '\0')
 						break;
-					}
-
-					j++;
+					bufferPort[j] = c;
 				}
-
-				i++;
-			} while ((c = split_request[i])!=0 && (c != '\r' || c != '\n') );
-
-
-			strcpy(webList_ptr[*numwebList].address, buffer);
-			strcpy(webList_ptr[*numwebList].port, bufferPort);
-
-			*numwebList = *numwebList + 1;
-
-			// Make list bigger
-			if (*numwebList >= numAllocWebList)
-			{
-				offlineList_t *tmp_ptr;
-
-				numAllocWebList *= 2;
-				tmp_ptr = webList_ptr;
-				webList_ptr = realloc(webList_ptr, sizeof(offlineList_t) * numAllocWebList);
-
-				// Alloc failed, fail parsing
-				if (webList_ptr == NULL) {
-					webList_ptr = tmp_ptr;
-					return qfalse;
-				}
+				break;
 			}
 
-			split_request = strtok(NULL, "\r\n");
-		} //while (split_request != NULL);
-	} 
+			bufferIP[i] = c;
+		}
+		//null terminate
+		bufferIP[i] = 0;
+		bufferPort[j] = 0;
+
+		strcpy(webList_ptr[*numwebList].address, bufferIP);
+		strcpy(webList_ptr[*numwebList].port, bufferPort);
+
+		*numwebList = *numwebList + 1;
+
+		// Make list bigger
+		if (*numwebList >= numAllocWebList)
+		{
+			offlineList_t *tmp_ptr;
+
+			numAllocWebList *= 2;
+			tmp_ptr = webList_ptr;
+			webList_ptr = realloc(webList_ptr, sizeof(offlineList_t) * numAllocWebList);
+
+			// Alloc failed, fail parsing
+			if (webList_ptr == NULL) {
+				webList_ptr = tmp_ptr;
+				return qfalse;
+			}
+		}
+		tokenPtr = strtok(NULL, "\n");
+	}
 
 	return qtrue;
 }
@@ -1355,15 +1307,12 @@ Load WebList
 */
 static void MAST_Check_WebList(qboolean isGS)
 {
-	int             i, bufChars;
-	char recvbuf[MAX_PACKET_SIZE_RECV];
-	char recvbufAll[MAX_PACKET_SIZE_RECV * 3];
-	struct sockaddr_in	tmpServerAddress;
-	char message[MAX_PACKET_SIZE_RECV];
-	char message1[] = "GET ";
-	char message2[] = " HTTP/1.1\r\nHost: ";
-	char message3[]="\r\n\r\n";
-	const char* webListFileNameString;
+	int                i, bufChars;
+	char               recvbuf[MAX_PACKET_SIZE_RECV];
+	char               recvbufAll[MAX_PACKET_SIZE_RECV * 3];
+	struct sockaddr_in tmpServerAddress;
+	char               message[MAX_PACKET_SIZE_RECV];
+	const char        *webListFileNameString;
 
 	//set time for next refresh
 	if (ping_list_time == 0)
@@ -1396,7 +1345,6 @@ static void MAST_Check_WebList(qboolean isGS)
 		}
 	}
 
-
 	//open weblist.txt. if valid, send packet
 	if (MAST_parseWebListFile(isGS))
 	{
@@ -1415,12 +1363,10 @@ static void MAST_Check_WebList(qboolean isGS)
 				if (!Sv_ResolveAddr(webString[i].address, &tmpServerAddress))
 					continue;
 
-				tmpServerAddress.sin_port = htons((u_short)atoi("80"));
-				//use port if any
-				if (webString[i].port[0] != '\0')
-					tmpServerAddress.sin_port = htons((u_short)atoi(webString[i].port));
 
-					
+				//use port if any
+				//if (webString[i].port[0] != '\0')
+				tmpServerAddress.sin_port = htons((u_short)atoi(webString[i].port));
 
 
 				webSock_tcp[i] = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP); //hypov8
@@ -1437,19 +1383,25 @@ static void MAST_Check_WebList(qboolean isGS)
 					continue;
 				}
 
-				memset(message, 0, sizeof(message));
-				strcat(message, message1);				//""GET "
-				strcat(message, webString[i].file);		//"list.htm"
-				strcat(message, message2);				//" HTTP/1.1\r\nHost: "
-				strcat(message, webString[i].address);	//www.123.com
-				strcat(message, message3);			//hypov8 todo: do we need address again?
+				sprintf(message,
+					"GET %s HTTP/1.1\r\n" // GET /list.htm HTTP/1.1
+					"Host: %s:%s\r\n"   // Host: www.123.com
+					"User-Agent: KingpinMaster/%i\r\n"
+					"Accept: text/html\r\n"
+					"Content-Type: text/html\r\n"
+					"\r\n",
+					webString[i].file,
+					webString[i].address, webString[i].port, //ip:port
+					VERSION);
+
 
 				//ioctlsocket(webSock_tcp[i], FIONBIO, &iMode);
 
 				//Send some data
 				//message = "GET /?st=1 HTTP/1.1\r\nHost: www.msn.com\r\n\r\n";
 				if (send(webSock_tcp[i], message, strlen(message), 0) == SOCKET_ERROR)	{
-					MsgPrint(MSG_WARNING, "WARNING: Send() failed. ( %s index: %i error: %d ) \n",
+					MsgPrint(MSG_WARNING, 
+						"WARNING: Send() failed. ( %s index: %i error: %d ) \n",
 						webListFileNameString, i + 1, ERRORNUM);
 					SocketError_close(webSock_tcp[i], SOCKET_WEB, i);
 					continue;
@@ -1471,11 +1423,10 @@ respopnce from WebList
 */
 static void MAST_WebList_Responce(int recieveSock)
 {
-	int				i, bufChars,iResult;
-	char			recvbuf[MAX_PACKET_SIZE_RECV+1];
-	char			recvbufAll[MAX_PACKET_SIZE_RECV * 3+1];
-	int				recvbufLen = MAX_PACKET_SIZE_RECV;
-	int				numwebList = 0; 
+	int  i, bufChars, iResult;
+	char recvbuf[MAX_PACKET_SIZE_RECV+1];
+	char recvbufAll[MAX_PACKET_SIZE_RECV * 3+1];
+	int  numwebList = 0; 
 
 	bufChars = 0;
 	i = 0;
@@ -1485,23 +1436,40 @@ static void MAST_WebList_Responce(int recieveSock)
 
 	//hypo todo: will sit here waiting for next packet.. 100+ servers set global?
 	do {
-		iResult = recv(webSock_tcp[recieveSock], recvbuf, recvbufLen, 0);
-		if (iResult > 0){
-			strncat(recvbufAll, recvbuf, iResult);
-			//strcat(recvbufAll, recvbuf);
-			MsgPrint(MSG_DEBUG, "WEBLIST: Bytes received: %d\n", iResult);
+		iResult = recv(webSock_tcp[recieveSock], recvbuf, MAX_PACKET_SIZE_RECV, 0);
+		if (iResult > 0)
+		{
+			if (strlen(recvbufAll) + iResult < MAX_PACKET_SIZE_RECV*3)
+			{
+				strncat(recvbufAll, recvbuf, iResult);
+				MsgPrint(MSG_DEBUG, "WEBLIST: Bytes received: %d\n", iResult);
+			}
+			else
+			{
+				MsgPrint(MSG_WARNING, "WARNING: Buffer full\n");
+				break;
+			}
 		}
 		else if (iResult == SOCKET_ERROR){
 			MsgPrint(MSG_WARNING, "WARNING: WEBLIST \'recv\' Failed. (Error: %d)\n", ERRORNUM);
 			break;
 		}
 
-		if (strstr(recvbuf, "404 Not Found") != NULL){
-			MsgPrint(MSG_WARNING, "ERROR: 404 Not Found. Check WebList.txt\n");
-			break;
+		//check header text
+		if (!x_strnicmp(recvbufAll, "HTTP/", 5))
+		{
+			//HTTP/1.1 301 Moved Permanently..
+			//HTTP/1.1 400 Bad Request..
+			char s1[20], s2[20], s3[200];
+			int result = sscanf(recvbufAll, "%s %s %s", s1, s2, s3); //HTTP/1.1 200 OK
+			if (result && s2[0] != '2')
+			{
+				MsgPrint(MSG_WARNING, "ERROR: Getting WebList \'%s %s %s\'\n", s1, s2, s3);
+				break; //failed
+			}
 		}
 
-		if (iResult > 0 && iResult < recvbufLen){
+		if (iResult > 0 && iResult < MAX_PACKET_SIZE_RECV){
 			MsgPrint(MSG_DEBUG, "WEBLIST: Finished. Bytes received: %i\n", iResult);
 			break;
 		}
@@ -1512,11 +1480,8 @@ static void MAST_WebList_Responce(int recieveSock)
 
 
 	// shutdown the connection since no more data will be sent
-	if (shutdown(webSock_tcp[recieveSock], TCP_SHUTBOTH) == SOCKET_ERROR){
+	if (shutdown(webSock_tcp[recieveSock], TCP_SHUTBOTH) == SOCKET_ERROR)
 		MsgPrint(MSG_WARNING, "WARNING: WEBLIST \'shutdown\' Failed. (Error: %d)\n", ERRORNUM);
-		SocketError_close(webSock_tcp[recieveSock], SOCKET_WEB, recieveSock);
-		//return;
-	}
 	SocketError_close(webSock_tcp[recieveSock], SOCKET_WEB, recieveSock);
 
 	//create memory for 3 servers initaly
@@ -1563,7 +1528,7 @@ MAST_parseIPConversionFile
 file loaded at start
 ====================
 */
-qboolean MAST_parseIPConversionFile(void)
+static qboolean MAST_parseIPConversionFile(void)
 {
 	FILE           *f = NULL;
 	int             i;
@@ -1576,7 +1541,7 @@ qboolean MAST_parseIPConversionFile(void)
 		MsgPrint(MSG_WARNING, "WARNING: Could not open \'ip_rename.txt\' \n");
 		return qfalse;
 	}
-
+	//todo put to buffer and close
 	while (!feof(f))
 	{
 		char            c;
@@ -1779,22 +1744,22 @@ Main function
 int main(int argc, const char *argv[])
 {
 	struct sockaddr_in address;
-	int				addrlen = sizeof(address);
+	int             addrlen = sizeof(address);
 	int             nb_bytes;
 	SOCKET_NET      recv_sock, fd_sok;
 	char            packet[MAX_PACKET_SIZE_RECV + 1];	// "+ 1" because we append a '\0'
 	qboolean        valid_options;
 	fd_set          rfds;
 	struct timeval  tv;
-	qboolean		isTCP, isKPQ3, isClient, isWebList;
-	int				iSendResult;
-	int				i;
-	int				sockCliNum, sockWebNum;
+	qboolean        isTCP, isKPQ3, isTCPClient, isWebList;
+	int             iSendResult;
+	int             i;
+	int             sockCliNum, sockWebNum;
 
 	//hypov8 initialize address
 	address.sin_family = AF_INET;
-    address.sin_port = 0;
-    address.sin_addr.s_addr = htonl(INADDR_ANY);
+	address.sin_port = 0;
+	address.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	signal(SIGINT, cleanUp);
 	signal(SIGTERM, cleanUp);
@@ -1866,7 +1831,7 @@ int main(int argc, const char *argv[])
 			fd_sok = inSock_tcp;
 #ifdef USE_ALT_OUTPORT
 		if (outSock_udp > fd_sok)
-			fd_sok = outSock;
+			fd_sok = outSock_udp;
 		if (outSock_kpq3 > fd_sok)
 			fd_sok = outSock_kpq3;
 #endif
@@ -1910,7 +1875,7 @@ int main(int argc, const char *argv[])
 
 
 		isTCP = 0;
-		isClient = 0;
+		isTCPClient = 0;
 		isKPQ3 = 0;
 		isWebList = 0;
 		memset(packet, 0, sizeof(packet)); //reset packet, prevent any issues
@@ -1960,7 +1925,7 @@ int main(int argc, const char *argv[])
 				if (clientinfo_tcp[i].socknum != INVALID_SOCKET &&
 					FD_ISSET(clientinfo_tcp[i].socknum, &rfds))
 				{
-					isClient = 1;
+					isTCPClient = 1;
 					sockCliNum = i;
 					break;
 				}
@@ -2052,7 +2017,7 @@ int main(int argc, const char *argv[])
 			// inital packet, wait for next packet
 			continue;
 		}
-		else if (isClient) //existing conection, get packet
+		else if (isTCPClient) //existing conection, get packet
 		{
 			nb_bytes = recv(clientinfo_tcp[sockCliNum].socknum, packet, MAX_PACKET_SIZE_RECV, 0);
 
@@ -2075,9 +2040,8 @@ int main(int argc, const char *argv[])
 			MAST_WebList_Responce(sockWebNum);
 			continue;
 		}
-		else //end TCP
-			///////////
-		{	//start UDP
+		else //UDP
+		{
 			nb_bytes = recvfrom(recv_sock, packet, sizeof(packet) - 1, 0, ( struct sockaddr * )&address, &addrlen);
 
 			if (nb_bytes == SOCKET_ERROR)
@@ -2110,7 +2074,7 @@ int main(int argc, const char *argv[])
 		///////////////
 		//handle packet
 		///////////////
-		if (!isClient && nb_bytes <= 0) //hypov8 note, error from sending ping after a shutdown. remove??
+		if (!isTCPClient && nb_bytes <= 0) //hypov8 note, error from sending ping after a shutdown. remove??
 		{
 			server_t       *server;
 
@@ -2145,7 +2109,7 @@ int main(int argc, const char *argv[])
 		}
 
 		// A few sanity checks
-		if (!isClient && nb_bytes < MIN_PACKET_SIZE)		{
+		if (!isTCPClient && nb_bytes < MIN_PACKET_SIZE)		{
 			MsgPrint(MSG_WARNING, "WARNING: rejected packet from %s (size = %d bytes)\n", peer_address, nb_bytes);
 			continue;
 		}
@@ -2162,7 +2126,7 @@ int main(int argc, const char *argv[])
 		/////////////////
 		//Handle Messages
 		/////////////////
-		if (isClient) //TCP GameSpy
+		if (isTCPClient) //TCP GameSpy
 		{
 			/* hypov8 packet sent in strange format, replace '\0' with '\\'  */
 			if (nb_bytes && packet[0] == '\0')
@@ -2184,7 +2148,7 @@ int main(int argc, const char *argv[])
 		{
 			MSG_HandleMessage_KPQ3(packet + 4, &address, recv_sock); //remove YYYY
 		}
-		else //kingpin
+		else //kingpin (UDP client/server query)
 		{
 			MSG_HandleMessage_KP1(packet, &address, recv_sock, nb_bytes);
 		}
@@ -2214,22 +2178,27 @@ MsgPrint
 Print a message to screen, depending on its verbose level
 ====================
 */
-int MsgPrint(msg_level_t msg_level, const char *format, ...)
+int MsgPrint(/*msg_level_t*/ int msg_level, const char *format, ...)
 {
-	va_list         args;
-	int             result;
+	va_list args;
+	int     result;
+	int     color = msg_level;
+	color &= ~0xff;
+
+	msg_level = msg_level & 0xff;
 
 	// If the message level is above the maximum level, don't print it
 	if(msg_level > max_msg_level)
 		return 0; 
 
-
 #ifdef WIN32
 	if ( !( hStdout == INVALID_HANDLE_VALUE ) )
 	{
-		if ( msg_level == 1 )
-			SetConsoleTextAttribute(hStdout, FOREGROUND_RED /*| FOREGROUND_INTENSITY*/);
-		else if ( msg_level == 2 )
+		if ( msg_level == 1 || color & MSG_COL_1)
+			SetConsoleTextAttribute(hStdout, FOREGROUND_RED | FOREGROUND_INTENSITY);
+		else if ( msg_level == 2)
+			SetConsoleTextAttribute(hStdout, FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_INTENSITY);
+		else if ( color & MSG_COL_2)
 			SetConsoleTextAttribute(hStdout, FOREGROUND_GREEN | FOREGROUND_RED /*| FOREGROUND_INTENSITY*/);
 		//SetTextColor(1, 3);
 		// SetConsoleTextAttribute();
@@ -2246,9 +2215,7 @@ int MsgPrint(msg_level_t msg_level, const char *format, ...)
 	//reset to white
 	if ( !( hStdout == INVALID_HANDLE_VALUE ) )
 	{
-		if ( msg_level == 1 )
-			SetConsoleTextAttribute(hStdout, FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_BLUE);
-		else if ( msg_level == 2 )
+		if ( msg_level == 1 || msg_level == 2 || color )
 			SetConsoleTextAttribute(hStdout, FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_BLUE);
 	}
 #endif

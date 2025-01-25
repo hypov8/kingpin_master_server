@@ -63,14 +63,14 @@ typedef struct server_s
 	char            challenge[CHALLENGE_MAX_LENGTH];
 	unsigned short  nbclients;
 	unsigned short  maxclients;
-	unsigned short  gsPort;		//hypov8 store kingpin game port seperate
-	qboolean isWaitResponce; //hypov8 server sent inital commands. so dont send status if timeout low
+	unsigned short  gsPort;         //hypov8 store kingpin game port seperate
+	qboolean        isWaitResponce; //hypov8 server sent inital commands. so dont send status if timeout low
 	time_t          timeout;
 	time_t          challenge_timeout;
-	char gamename[64];
+	char            gamename[64];
 	const struct addrmap_s *addressReMap;
-	qboolean        active;
-	time_t          lastGameStat;
+	qboolean               active;  //is server active. todo check this
+	time_t                 lastGameStat;
 } server_t;
 
 
