@@ -1,0 +1,6 @@
+// offline servers to ping. non dedicated server, wrong master used in server etc..
+//
+//123.123.123.123:31510
+//kp.servegame.com:31510
+//kp.servegame.com:31512
+//192.168.1.123:31510

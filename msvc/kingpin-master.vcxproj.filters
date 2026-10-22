@@ -1,0 +1,78 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="..\src\messages.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\resource.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\servers.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\common.h">
+      <Filter>src</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\src\master.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\messages.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\servers.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\web.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\config.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\gspy.c">
+      <Filter>src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\config\help.txt">
+      <Filter>config</Filter>
+    </Text>
+    <Text Include="..\config\ip_ignore.txt">
+      <Filter>config</Filter>
+    </Text>
+    <Text Include="..\config\ip_offline.txt">
+      <Filter>config</Filter>
+    </Text>
+    <Text Include="..\config\ip_weblist_gs.txt">
+      <Filter>config</Filter>
+    </Text>
+    <Text Include="..\config\ip_rename.txt">
+      <Filter>config</Filter>
+    </Text>
+    <Text Include="..\config\ip_weblist.txt">
+      <Filter>config</Filter>
+    </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="src">
+      <UniqueIdentifier>{68564198-f4c6-4de2-af10-afb07da381a3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="config">
+      <UniqueIdentifier>{1a05256a-d4bd-422b-957e-78b5aa1231ab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="resources">
+      <UniqueIdentifier>{c7286e0c-16c5-439b-8c66-c1c1c72605db}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\resources\icon_master1.2.ico">
+      <Filter>resources</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\resources\Kingpin-master.rc">
+      <Filter>resources</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+</Project>

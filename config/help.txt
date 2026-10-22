@@ -1,0 +1,50 @@
+=============
+ip_rename.txt
+=============
+1 line per server eg..
+-----
+192.168.1.121=110.175.51.202
+192.168.1.123=kp.servegame.com
+-----
+
+
+====================
+command line options
+====================
+-h help
+
+-H Hash size
+
+-l set the listen ip address
+
+-m Map address <a1> to <a2> when sending it to clients\n"
+	Add an unresolved address mapping to the list
+	mapping must be of the form "addr1:port1=addr2:port2", ":portX" are optional
+	eg... 
+	     kingpin-master.exe -m "192.168.1.121=110.175.51.202" -m "192.168.1.123=kp.servegame.com" 
+
+-n Maximum number of servers
+
+-p Port number for Kingpin (default 27900)
+
+-q Port number KingpinQ3 (default 27950)
+
+-v Verbose level, up to 4 (default: 3; no value after V means 4)"
+
+-s Static ip address. Only use if master ip is not dynamic. 
+	will not recheck ip conversion for dns in ip_rename.txt
+
+--== linux only ==--
+-D run as a daemon\n"
+-j <jail_path>   : use <jail_path> as chroot path (default: %s)\n"
+                   only available when running with super-user privileges\n"
+-u <user>        : use <user> privileges (default: %s)\n"
+                   only available when running with super-user privileges\n"
+
+
+====================
+kingpin servers
+====================
+when running master on same pc as the servers, you need to setmaster to the lan ip address.
+wan ip will return the ip of the router and make ip conversion invalid.
+use ip_rename.txt or -m
