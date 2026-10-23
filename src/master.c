@@ -26,6 +26,8 @@
 #include <ctype.h>
 
 #ifndef WIN32
+//#define _DEFAULT_SOURCE
+#define _GNU_SOURCE
 # include <pwd.h>
 # include <unistd.h>
 #endif
@@ -80,7 +82,9 @@ static time_t   ping_timoutSV_time = 0; //add hypo get server updates
 static time_t   ping_list_time = 0; // ping offline/web list
 
 //hypo console colors
-static HANDLE hStdout; // , hStdin;
+#ifdef WIN32
+static HANDLE hStdout;
+#endif
 // CONSOLE_SCREEN_BUFFER_INFO csbiInfo;
 //
 
@@ -108,6 +112,7 @@ SOCKET_NET		outSock_kpq3 = INVALID_SOCKET; // out kpq3
 //web sockets
 SOCKET_NET		webSock_tcp[MAX_WEBLIST];
 
+clientTemp2_t clientinfo_tcp[MAX_CLIENTS];
 
 // The current time (updated every time we receive a packet)
 time_t          crt_time;
@@ -129,44 +134,26 @@ PrintPacket
 Print the contents of a packet on stdout
 ====================
 */
-void PrintPacket(const char *packet, size_t length)
+void PrintPacket(const char *packet, int length)
 {
-	size_t i;
-	int    j;
-	char   pket[MAX_PACKET_SIZE_RECV *2];
-	qbyte  c;
+	char pket[MAX_PACKET_SIZE_RECV * 4 + 32];
+	int  pos = 0;
+	qbyte c;
+	int  i;
 
-	memset(pket, 0, sizeof(pket));
+	pket[pos++] = '\"';
 
-	// Exceptionally, we use MSG_NOPRINT here because if the function is
-	// called, the user probably wants this text to be displayed
-	// whatever the maximum message level is.
-
-	//MsgPrint(MSG_NOPRINT| MSG_COL_1, "\"");
-	strcpy(pket, "\"");
-	j = 1;
-
-	for(i = 0; i < length; i++)
+	for (i = 0; i < length; i++)
 	{
 		c = packet[i];
-
-		/*if (c == '\\')
-		{
-			strcat(pket, "\\\\");//MsgPrint(MSG_NOPRINT | MSG_COL_1, "\\\\");
-			j++;
-		}
-		else*/ if (c < 32 || c > 127)
-		{ //print as hex
-			sprintf(pket, "%s\\x%02hhX", pket, c);//MsgPrint(MSG_NOPRINT, "\\x%02X", c);
-			j += 3;
-		}
+		if (c < 32 || c > 127)
+			pos += snprintf(pket + pos, sizeof(pket) - pos, "\\x%02X", c);
 		else
-			pket[j] = c;//MsgPrint(MSG_NOPRINT, "%c", c);
-		j++;
+			pket[pos++] = c;
 	}
-	sprintf(pket, "%s\" (%04u bytes)\n", pket, length); 
-	j += 14;
-	MsgPrint(MSG_NOPRINT| MSG_COL_2, "%s", pket);
+
+	pos += snprintf(pket + pos, sizeof(pket) - pos, "\" (%04d bytes)\n", length);
+	MsgPrint(MSG_NOPRINT | MSG_COL_2, "%s", pket);
 }
 
 
@@ -324,7 +311,7 @@ static qboolean UnsecureInit(void)
 			return qfalse;
 		}
 
-		memcpy(&listen_addr.s_addr, itf->h_addr, sizeof(listen_addr.s_addr));
+		memcpy(&listen_addr.s_addr, itf->h_addr_list[0], sizeof(listen_addr.s_addr));
 	}
 
 	return qtrue;
@@ -703,14 +690,14 @@ static qboolean SecureInit(void)
 		int bOptLen = sizeof(int);
 
 		int iOptVal = 0;
-		int iOptLen = sizeof(int);
+		socklen_t iOptLen = sizeof(int);
 		//bOptVal = TRUE;
 
 		//						sock		int			int				char		int
 		iResult = setsockopt(inSock_udp, SOL_SOCKET, SO_RCVBUF, (char *)&bOptVal, bOptLen);
 		if (iResult !=SOCKET_ERROR)
 		{
-			iResult = getsockopt(inSock_udp, SOL_SOCKET, SO_RCVBUF, (char *)&iOptVal, &iOptLen);
+			iResult = getsockopt(inSock_udp, SOL_SOCKET, SO_RCVBUF, (void *)&iOptVal, &iOptLen);
 			if (iResult !=SOCKET_ERROR)
 				MsgPrint(MSG_NORMAL, "recv Buf:   %ld \n", iOptVal);
 		}
@@ -805,8 +792,9 @@ static void MAST_GlobalTimedEvent(void)
 			clientinfo_tcp[i].timeout < crt_time) //add extra time?
 		{
 			char tmpIP[128];
-			snprintf(tmpIP, sizeof(tmpIP), "%s:%hu", inet_ntoa(clientinfo_tcp[i].tmpClientAddress.sin_addr), 
-														ntohs(clientinfo_tcp[i].tmpClientAddress.sin_port));
+			snprintf(tmpIP, sizeof(tmpIP), "%s:%hu", 
+				inet_ntoa(clientinfo_tcp[i].tmpClientAddress.sin_addr), 
+				ntohs(clientinfo_tcp[i].tmpClientAddress.sin_port));
 			MsgPrint(MSG_WARNING, "%-21s ---- %-22s Removed \n", tmpIP, "Client timed out.");
 			SocketError_close(clientinfo_tcp[i].socknum, SOCKET_CLIENT, i);
 		}
@@ -902,7 +890,7 @@ Main function
 int main(int argc, const char *argv[])
 {
 	struct sockaddr_in address;
-	int             addrlen = sizeof(address);
+	socklen_t       addrlen = sizeof(address);
 	int             nb_bytes;
 	SOCKET_NET      recv_sock, fd_sok;
 	char            packet[MAX_PACKET_SIZE_RECV + 1];	// "+ 1" because we append a '\0'
@@ -939,12 +927,17 @@ int main(int argc, const char *argv[])
 	// Initializations
 	if (!SysInit() || !UnsecureInit() || !SecInit() || !SecureInit())
 	{
+#ifdef _DEBUG
+		SV_ClearMem();
+		CFG_ClearMem();
+#endif
 		MsgPrint(MSG_ERROR, "\n  --==  SHUTTING DOWN  ==--\n");
 		Sys_Sleep(5000); //5 seconds
 		return EXIT_FAILURE;
 	}
 #ifdef _DEBUG
-	if ( !( SetConsoleCtrlHandler(CtrlHandler, TRUE) ) )	{
+	if ( !( SetConsoleCtrlHandler(CtrlHandler, TRUE) ) )	
+	{
 		MsgPrint(MSG_ERROR, "\n  --==  SHUTTING DOWN  ==--\n");
 		Sys_Sleep(5000); //5 seconds
 		return EXIT_FAILURE;
@@ -1316,15 +1309,40 @@ int main(int argc, const char *argv[])
 
 #ifdef _DEBUG
 	SV_ClearMem();
-#endif
-	//WEB_ClearMem();
 	CFG_ClearMem();
-
+#endif
 	/* allow enough time to spot error */
 	Sys_Sleep(500); //500 milliseconds
 
 	/* close program */
 	return 0;
+}
+
+static void set_color(int color) 
+{
+#ifdef _WIN32
+	if ( !( hStdout == INVALID_HANDLE_VALUE ) )
+		SetConsoleTextAttribute(hStdout, (WORD)color);
+#else
+	// map your color constants to ANSI codes
+	switch (color)
+	{
+		case CONSOLE_COLOR_WHITE:
+			fprintf(stdout, "\033[0m"); 
+			break;
+		case CONSOLE_COLOR_RED:
+			fprintf(stdout, "\033[31m");  //red
+			break;
+		case CONSOLE_COLOR_YELLOW:
+			fprintf(stdout, "\033[0m"); //bold yellow
+			break;
+		case CONSOLE_COLOR_BROWN: 
+			fprintf(stdout, "\033[0m"); //yellow
+			break;
+		default:
+			break;
+	}
+#endif
 }
 
 
@@ -1338,39 +1356,26 @@ MsgPrint
 Print a message to screen, depending on its verbose level
 ====================
 */
-int MsgPrint(/*msg_level_t*/ int msg_level, const char *format, ...)
+int MsgPrint(int msg_level, const char *format, ...)
 {
 	va_list args;
 	int     result;
-	int     color = msg_level;
-#ifdef WIN32
-	//hypo console colors
-	//static HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
-	// , hStdin;
-	// CONSOLE_SCREEN_BUFFER_INFO csbiInfo;
-#endif
-
-	color &= ~0xff;
-
-	msg_level = msg_level & 0xff;
+	int     color = (msg_level & MSG_COLOR_MASK);
+	msg_level_t  msg_mode = (msg_level& MSG_LEVEL_MASK);
 
 	// If the message level is above the maximum level, don't print it
-	if(msg_level > max_msg_level)
+	if(msg_mode  > max_msg_level)
 		return 0; 
 
-#ifdef WIN32
-	if ( !( hStdout == INVALID_HANDLE_VALUE ) )
-	{
-		if ( msg_level == 1 || color & MSG_COL_1)
-			SetConsoleTextAttribute(hStdout, FOREGROUND_RED | FOREGROUND_INTENSITY);
-		else if ( msg_level == 2)
-			SetConsoleTextAttribute(hStdout, FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_INTENSITY);
-		else if ( color & MSG_COL_2)
-			SetConsoleTextAttribute(hStdout, FOREGROUND_GREEN | FOREGROUND_RED /*| FOREGROUND_INTENSITY*/);
-		//SetTextColor(1, 3);
-		// SetConsoleTextAttribute();
-	}
-#endif
+	if (msg_mode == MSG_ERROR || color & MSG_COL_1)
+		set_color(CONSOLE_COLOR_RED);
+	else if (msg_mode == MSG_WARNING)
+		set_color(CONSOLE_COLOR_YELLOW);
+	else if (color & MSG_COL_2)
+		set_color(CONSOLE_COLOR_BROWN);
+	//SetTextColor(1, 3);
+	// SetConsoleTextAttribute();
+	
 
 	va_start(args, format);
 	result = vprintf(format, args);
@@ -1378,14 +1383,8 @@ int MsgPrint(/*msg_level_t*/ int msg_level, const char *format, ...)
 
 	fflush(stdout);
 
-#ifdef WIN32
-	//reset to white
-	if ( !( hStdout == INVALID_HANDLE_VALUE ) )
-	{
-		if ( msg_level == 1 || msg_level == 2 || color )
-			SetConsoleTextAttribute(hStdout, FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_BLUE);
-	}
-#endif
+	if (msg_level == 1 || msg_level == 2 || color)
+		set_color(CONSOLE_COLOR_WHITE);
 
 	return result;
 }

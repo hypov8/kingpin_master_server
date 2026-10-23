@@ -369,6 +369,7 @@ static void MSG_RespondToGetServers_GSpyTCP(const struct sockaddr_in *addr, int 
 	char            tmp_packet[30];
 	qboolean        isKingpin;
 	unsigned int    numServers = 0;
+	int pos = 0;
 
 #if 0 //def KINGPIN_ONLY
 	if (!(x_strcmpi(challenge, "Kingpin") == 0) &&
@@ -503,7 +504,7 @@ static void MSG_RespondToGetServers_GSpyTCP(const struct sockaddr_in *addr, int 
 			packet[packetind + 5] = sv_port & 0xFF;
 			packetind += 6;
 			// add server to printed debug packet
-			sprintf(printStr, "%s/ip/%s:%hu", printStr, print_sv_addr, sv_port);
+			pos += snprintf(printStr + pos, sizeof(printStr) - pos, "/ip/%s:%hu", print_sv_addr, sv_port);
 		}
 		else //gsEncType -1 (gspylite)
 		{
@@ -511,7 +512,7 @@ static void MSG_RespondToGetServers_GSpyTCP(const struct sockaddr_in *addr, int 
 			strcat(packet, tmp_packet);
 			packetind += strlen(tmp_packet);
 			// add server to printed debug packet
-			sprintf(printStr, "%s/ip/%s:%hu", printStr, print_sv_addr, sv_port);
+			pos += snprintf(printStr + pos, sizeof(printStr) - pos, "/ip/%s:%hu", print_sv_addr, sv_port);
 		}
 		numServers++;
 	}
@@ -539,14 +540,15 @@ static void MSG_RespondToGetServers_Quake(const struct sockaddr_in *addr,
 	unsigned long   sv_addr;
 	unsigned short  sv_port;
 	unsigned int    numServers = 0;
-	char            print[2048];
+	char            printStr[2048];
 	SOCKET_NET      snd_sock = (outSock_udp != INVALID_SOCKET) ? outSock_udp : recv_sock; //USE_ALT_OUTPORT
+	int pos = 0;
 
 	if (max_msg_level >= MSG_DEBUG) //hypov8 print b4 debug stuff below
 		MsgPrint(MSG_NORMAL, "%-21s ---> getservers (QuakeBrowser) \n", peer_address);
 
 	memset(packet, 0, sizeof(packet)); //reset packet, prevent any issues
-	memset(print, 0, sizeof(print)); //reset packet, prevent any issues
+	memset(printStr, 0, sizeof(printStr)); //reset packet, prevent any issues
 
 	// Initialize the packet contents with the header
 	if (isHexen)
@@ -571,7 +573,7 @@ static void MSG_RespondToGetServers_Quake(const struct sockaddr_in *addr,
 			// End Of Transmission
 			// none on quake2?
 
-			MsgPrint(MSG_DEBUG, "- Sending packet: servers %s\n", print);
+			MsgPrint(MSG_DEBUG, "- Sending packet: servers %s\n", printStr);
 
 			sendto(snd_sock, packet, packetind, 0, (const struct sockaddr *)addr, sizeof(*addr));
 
@@ -626,10 +628,10 @@ static void MSG_RespondToGetServers_Quake(const struct sockaddr_in *addr,
 		//skip server. incomplete data
 		if (sv->isWaitResponce)
 			continue;
-
-		sprintf(print, "%s\\%u.%u.%u.%u:%hu\\", print,
-			(int)(sv_addr >> 24), (int)((sv_addr >> 16) & 0xFF),
-			(int)((sv_addr >> 8) & 0xFF), (int)(sv_addr & 0xFF),
+		pos += snprintf(printStr + pos, sizeof(printStr) - pos,
+			"\\%u.%u.%u.%u:%hu\\", 
+			(unsigned)(sv_addr >> 24), (unsigned)((sv_addr >> 16) & 0xFF),
+			(unsigned)((sv_addr >> 8) & 0xFF), (unsigned)(sv_addr & 0xFF),
 			sv_port);
 
 		// IP address
@@ -672,6 +674,7 @@ static void MSG_RespondToGetServers_KPQ3(const char *msg, const struct sockaddr_
 	qboolean        no_full;
 	unsigned int    numServers = 0;
 	SOCKET_NET      snd_sock = (outSock_kpq3 != INVALID_SOCKET) ? outSock_kpq3 : recv_sock; //USE_ALT_OUTPORT
+	int pos = 0;
 
 
 	// Check if there's a name before the protocol number
@@ -816,7 +819,7 @@ static void MSG_RespondToGetServers_KPQ3(const char *msg, const struct sockaddr_
 #else
 		//MsgPrint(MSG_DEBUG, "- Sending server: %s\n", packet);
 
-		sprintf(printStr, "%s/ip/%s:%hu", printStr, print_sv_addr, sv_port);
+		pos += snprintf(printStr + pos, sizeof(printStr) - pos, "/ip/%s:%hu", print_sv_addr, sv_port);
 #endif
 		packetind += 7;
 		numServers++;

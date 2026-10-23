@@ -31,6 +31,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <time.h>
+#include <ctype.h>
 
 #ifdef WIN32
 # include <winsock2.h>
@@ -48,6 +49,7 @@
 # include <arpa/inet.h>
 # include <netdb.h>
 # include <sys/socket.h>
+#include <sys/select.h>
 #endif
 
 //#define USE_ALT_OUTPORT
@@ -60,7 +62,7 @@
 ////////////////
 
 // Version of dpmaster
-#define KP_MASTER_VERSION "1.6.14" //hypov8 version
+#define KP_MASTER_VERSION "1.6.15" //hypov8 version
 
 // Maximum and minimum sizes for a valid packet
 #define MIN_PACKET_SIZE 3 // was 5
@@ -74,10 +76,24 @@
 #define SOCKET_CLIENT   1
 #define SOCKET_WEB      2
 
+#define MSG_LEVEL_MASK  0x00FF
+#define MSG_COLOR_MASK  0xFF00
 #define MSG_COL_1 (1 <<8)
 #define MSG_COL_2 (1 <<9)
 #define MSG_COL_3 (1 <<10)
 #define MSG_COL_4 (1 <<11)
+
+#ifdef WIN32
+#define CONSOLE_COLOR_WHITE (FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_BLUE)
+#define CONSOLE_COLOR_RED (FOREGROUND_RED | FOREGROUND_INTENSITY)
+#define CONSOLE_COLOR_YELLOW (FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_INTENSITY)
+#define CONSOLE_COLOR_BROWN  (FOREGROUND_GREEN | FOREGROUND_RED)
+#else
+#define CONSOLE_COLOR_WHITE  0
+#define CONSOLE_COLOR_RED    1 
+#define CONSOLE_COLOR_YELLOW 2
+#define CONSOLE_COLOR_BROWN  3
+#endif
 
 // web list
 #define MAX_WEBLIST          3
@@ -226,6 +242,14 @@ typedef struct
 	char  port[PORT_LENGTH];
 } ipPortList_t;
 
+#ifdef WIN32
+  // winsock2.h already defines SOCKET
+	typedef int socklen_t;
+#else
+	typedef int SOCKET;
+#endif
+
+
 // ---------- Public variables ---------- //
 
 // The master socket
@@ -273,7 +297,7 @@ extern char peer_address[128];
 #define INVALID_SOCKET -1
 #define x_strdup       strdup
 #define x_strcmpi      strcasecmp
-#define x_strnicmp     strnicmp
+#define x_strnicmp     strncasecmp
 #endif
 
 #ifndef max
@@ -287,7 +311,7 @@ extern char peer_address[128];
 // Print a message to screen, depending on its verbose level
 int  MsgPrint(/*msg_level_t*/int msg_level, const char *format, ...);
 void SocketError_close(SOCKET_NET socket, int type, int index);
-void PrintPacket(const char *packet, size_t length);
+void PrintPacket(const char *packet, int length);
 
 
 

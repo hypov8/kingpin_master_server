@@ -37,7 +37,7 @@ typedef struct clientTemp2_s
 }clientTemp2_t;
 
 
-clientTemp2_t clientinfo_tcp[MAX_CLIENTS];
+extern clientTemp2_t clientinfo_tcp[MAX_CLIENTS];
 
 // ---------- Public functions ---------- //
 

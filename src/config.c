@@ -51,12 +51,12 @@ will always load file when a new ip request
 */
 static qboolean CFG_Ignore_parseAddress(void)
 {
-	int           i;
+	int           i, c;
 	FILE         *f = NULL;
 	qboolean      skipLine;
 	static int    num_ignore = 0;
 	static time_t lastUpdateTime = 0;
-	char c, buffer[ADDRESS_LENGTH];
+	char buffer[ADDRESS_LENGTH];
 	
 	if (ignoreAddresses == NULL)
 		return 0;
@@ -85,7 +85,7 @@ static qboolean CFG_Ignore_parseAddress(void)
 
 		// Skip whitespace
 		do {
-			c = (char)fgetc(f);
+			c = fgetc(f);
 		}
 		while(c != EOF && isspace(c));
 
@@ -101,7 +101,7 @@ static qboolean CFG_Ignore_parseAddress(void)
 					break;
 				}
 
-				buffer[i] = c;
+				buffer[i] = (char)c;
 
 				if (isspace(c))
 				{
@@ -119,7 +119,7 @@ static qboolean CFG_Ignore_parseAddress(void)
 				}
 
 				i++;
-			} while ((c = (char)fgetc(f)) != EOF);
+			} while ((c = fgetc(f)) != EOF);
 
 			if (!skipLine)
 			{
@@ -129,10 +129,10 @@ static qboolean CFG_Ignore_parseAddress(void)
 				// Make list bigger
 				if (num_ignore >= ignoreAddresses_count)
 				{
-					ignoreAddress_t *tmp_ptr;
+					//ignoreAddress_t *tmp_ptr;
 
 					ignoreAddresses_count *= 2;
-					tmp_ptr = ignoreAddresses;
+					//tmp_ptr = ignoreAddresses;
 					ignoreAddresses = realloc(ignoreAddresses, sizeof(ignoreAddress_t) * ignoreAddresses_count);
 
 					// Alloc failed, fail parsing
@@ -190,8 +190,8 @@ hypo offline list to ping
 static int CFG_Offline_Parse()
 {
 	FILE *f = NULL;
-	char *portPtr, j, c, s[ADDRESS_LENGTHMAX], p[PORT_LENGTH];
-	int   numOfflineList = 0;
+	char *portPtr, c, s[ADDRESS_LENGTHMAX], p[PORT_LENGTH];
+	int   j, numOfflineList = 0;
 
 	MsgPrint(MSG_DEBUG, "Loading... %s\n", ipOfflineFile_Name);
 	f = fopen(ipOfflineFile_Name, "r");
@@ -315,7 +315,7 @@ Load offline list
 */
 void CFG_Offline_Begin()
 {
-	int numAllocOfflineList = 3;
+	//int numAllocOfflineList = 3;
 	int numOfflineList = 0;
 
 	MsgPrint(MSG_DEBUG, "Processing Offline List\n");

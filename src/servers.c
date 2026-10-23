@@ -168,7 +168,7 @@ qboolean Sv_ResolveAddr(const char *name, struct sockaddr_in *addr)
 			return qfalse;
 		}
 		//convert
-		ulAddr = *(u_long*)host->h_addr;
+		ulAddr = *(u_long*)host->h_addr; //h_addr_list[0]
 	}
 
 	// 0.0.0.0 addresses are forbidden
@@ -466,7 +466,7 @@ void Sv_PingTimeOut_GamePort(void)
 {
 	server_t		*sv;
 	unsigned long	sv_addr;
-	char			*char_sv_addr;
+	//char			*char_sv_addr;
 	unsigned short  sv_port;
 	SOCKET_NET snd_sock_kp = (outSock_udp != INVALID_SOCKET) ? outSock_udp : inSock_udp;
 	SOCKET_NET snd_sock_kpq3 = (outSock_kpq3 != INVALID_SOCKET) ? outSock_kpq3 : inSock_kpq3;
@@ -484,7 +484,7 @@ void Sv_PingTimeOut_GamePort(void)
 		if (sv->isWaitResponce)
 			continue;
 
-		char_sv_addr = inet_ntoa(sv->address.sin_addr);
+		//char_sv_addr = inet_ntoa(sv->address.sin_addr);
 		sv_port = ntohs(sv->address.sin_port);
 		sv_addr = ntohl(sv->address.sin_addr.s_addr);
 
@@ -588,7 +588,7 @@ void Sv_PingOfflineList(char *ip, char *port, qboolean isGSpy, const char *packe
 		(const struct sockaddr *)&tmpServerAddress, sizeof(tmpServerAddress));
 
 	if (nb_bytes == SOCKET_ERROR){
-		snprintf(tmpIP, sizeof(tmpIP), "%s:%S", ip, port);
+		snprintf(tmpIP, sizeof(tmpIP), "%s:%s", ip, port);
 		MsgPrint(MSG_WARNING, "%-21s ---> %-22s error:%i\n",
 			tmpIP, "WARNING: \'sendto\' offlineList\n", ERRORNUM);
 	}

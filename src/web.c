@@ -64,7 +64,7 @@ typedef struct
 // ---------- Private variables ---------- //
 
 //web list
-static int numwebList = 0;
+//static int numwebList = 0;
 
 static const char *webFileName_gamePort = "ip_weblist.txt";
 static const char *webFileName_gameSpy  = "ip_weblist_gs.txt";
@@ -171,11 +171,11 @@ static qboolean WEB_ParseFile(qboolean isGSPorts, webList_t *webHostList)//char*
 
 static qboolean WEB_parseWebListIPs(char *webText)
 {
-	int       i, k, numwebList = 0;
+	int       i, numwebList = 0;
 	int       portLen = 0;
 	char     *tokenPtr;
 	char      c, bufferIP[ADDRESS_LENGTHMAX], bufferPort[PORT_LENGTH];
-	qboolean  port;
+	//qboolean  port;
 	//ipPortList_t *list;
 	
 	if (!webText[0])
@@ -202,7 +202,6 @@ static qboolean WEB_parseWebListIPs(char *webText)
 
 	while (tokenPtr != NULL)
 	{
-		k = 0;
 		c = tokenPtr[0];
 
 		// Skip whitespace
@@ -219,7 +218,7 @@ static qboolean WEB_parseWebListIPs(char *webText)
 			continue;
 		}
 
-		port = qfalse;
+		//port = qfalse;
 		for (i = 0; i < ADDRESS_LENGTHMAX; i++)
 		{
 			c = tokenPtr[i];
@@ -233,7 +232,7 @@ static qboolean WEB_parseWebListIPs(char *webText)
 			//port
 			if (c == ':')
 			{
-				port = qtrue;
+				//port = qtrue;
 				for (portLen = 0; portLen < PORT_LENGTH; portLen++)
 				{
 					c = tokenPtr[i + portLen + 1];
