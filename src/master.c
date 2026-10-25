@@ -109,8 +109,6 @@ SOCKET_NET		inSock_tcp =   INVALID_SOCKET; // in tcp
 //USE_ALT_OUTPORT
 SOCKET_NET		outSock_udp =  INVALID_SOCKET; // out kp
 SOCKET_NET		outSock_kpq3 = INVALID_SOCKET; // out kpq3
-//web sockets
-SOCKET_NET		webSock_tcp[MAX_WEBLIST];
 
 clientTemp2_t clientinfo_tcp[MAX_CLIENTS];
 
@@ -189,9 +187,6 @@ type =
 			clientinfo_tcp[index].timeout = 0;
 			break;
 
-		case SOCKET_WEB:
-			webSock_tcp[index] = INVALID_SOCKET;
-			break;
 		default:
 			break;
 	}
@@ -745,9 +740,6 @@ static void cleanUp(int signal)
 }
 
 
-
-
-
 /*
 ====================
 replaceNullChar
@@ -759,11 +751,9 @@ void replaceNullChar(char *packet, int packet_len)
 {
 	int i;
 
-	for (i = 0; i <= packet_len; i++)
+	for (i = 0; i < packet_len; i++)
 	{
-		if (i == packet_len) //hypov8 note +1 ok?
-			packet[ i ] = '\0';
-		else if (packet[i] == '\0')
+		if (packet[i] == '\0')
 			packet[i] = '\\';
 	}
 }
@@ -822,7 +812,7 @@ static void MAST_GlobalTimedEvent(void)
 		case 1:
 		case 2:
 		default:
-				WEB_Begin();//game port
+				WEB_Begin_Send();//game port
 			break;
 		}
 
@@ -950,17 +940,13 @@ int main(int argc, const char *argv[])
 	for (i = 0; i < MAX_CLIENTS; i++){
 		clientinfo_tcp[i].socknum = INVALID_SOCKET;
 	}
-	//initialise all web_socket[] to 0 so not checked
-	for (i = 0; i < MAX_WEBLIST; i++){
-		webSock_tcp[i] = INVALID_SOCKET;
-	}
 
 	//inital startup. process offline/web_lists
 	CFG_Init();
 	CFG_Offline_Begin(); //must be first then weblist
 
 	WEB_Init();
-	WEB_Begin();//GS port first
+	WEB_Begin_Send();//GS port first
 	ping_list_time = crt_time + 20; //check next list sooner
 	ping_dns_time = crt_time + REFRESH_TIME_DNS; //5 min
 
@@ -997,15 +983,6 @@ int main(int argc, const char *argv[])
 					fd_sok = clientinfo_tcp[i].socknum;
 			}
 		}
-		//add child web sockets to set 
-		for (i = 0; i < MAX_WEBLIST; i++)
-		{
-			if (webSock_tcp[i] != INVALID_SOCKET) {
-				FD_SET(webSock_tcp[i], &rfds);
-				if (webSock_tcp[i] > fd_sok)
-					fd_sok = webSock_tcp[i];
-			}
-		}
 
 
 		//hypov8 moved up. allow update pings to servers
@@ -1019,6 +996,8 @@ int main(int argc, const char *argv[])
 			if (iSendResult < 0)
 				MsgPrint(MSG_WARNING, "WARNING: TCP \'select\' socket Failed. (Error: %d) \n", ERRORNUM);
 
+			//check weblists responce
+			WEB_PollWebList();
 			//run event's when there is nothing else to do
 			MAST_GlobalTimedEvent();
 
@@ -1056,6 +1035,7 @@ int main(int argc, const char *argv[])
 			recv_sock = outSock_kpq3;
 		}
 #endif
+#if 0
 		else if (webSock_tcp[0] != INVALID_SOCKET &&
 			FD_ISSET(webSock_tcp[0], &rfds))	{
 			isWebList = qtrue;
@@ -1071,6 +1051,7 @@ int main(int argc, const char *argv[])
 			isWebList = qtrue;
 			sockWebNum = 2;
 		}
+#endif
 		else
 		{
 			for (i = 0; i < MAX_CLIENTS; i++)
@@ -1187,12 +1168,14 @@ int main(int argc, const char *argv[])
 				continue;
 			}
 		}
+#if 0
 		else if (isWebList)
 		{
 			MsgPrint(MSG_DEBUG, "WEBLIST: Responce \n");
 			WEB_HandleResponce(sockWebNum);
 			continue;
 		}
+#endif
 		else //UDP
 		{
 			nb_bytes = recvfrom(recv_sock, packet, sizeof(packet) - 1, 0, ( struct sockaddr * )&address, &addrlen);
@@ -1311,6 +1294,9 @@ int main(int argc, const char *argv[])
 	SV_ClearMem();
 	CFG_ClearMem();
 #endif
+
+	WEB_Cleanup();
+
 	/* allow enough time to spot error */
 	Sys_Sleep(500); //500 milliseconds
 
@@ -1334,10 +1320,10 @@ static void set_color(int color)
 			fprintf(stdout, "\033[31m");  //red
 			break;
 		case CONSOLE_COLOR_YELLOW:
-			fprintf(stdout, "\033[0m"); //bold yellow
+			fprintf(stdout, "\033[1;33m"); //bold yellow
 			break;
 		case CONSOLE_COLOR_BROWN: 
-			fprintf(stdout, "\033[0m"); //yellow
+			fprintf(stdout, "\033[33m"); //yellow
 			break;
 		default:
 			break;
@@ -1383,7 +1369,7 @@ int MsgPrint(int msg_level, const char *format, ...)
 
 	fflush(stdout);
 
-	if (msg_level == 1 || msg_level == 2 || color)
+	if (msg_mode == MSG_ERROR || msg_mode == MSG_WARNING || color)
 		set_color(CONSOLE_COLOR_WHITE);
 
 	return result;

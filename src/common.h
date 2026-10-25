@@ -37,7 +37,7 @@
 # include <winsock2.h>
 
 #ifdef _DEBUG
-	# include <vld.h> //debug mem
+	//# include <vld.h> //debug mem
 	//#include "windows.h"
 	#include "psapi.h" //mem size
 	//#include <ws2tcpip.h>
@@ -62,7 +62,7 @@
 ////////////////
 
 // Version of dpmaster
-#define KP_MASTER_VERSION "1.6.15" //hypov8 version
+#define KP_MASTER_VERSION "1.6.16" //hypov8 version
 
 // Maximum and minimum sizes for a valid packet
 #define MIN_PACKET_SIZE 3 // was 5
@@ -74,7 +74,6 @@
 #define ADDRESS_LENGTHMAX 253 //16+16+1 //hypov8 ip+ip+= //changed.. dns lengths.....
 
 #define SOCKET_CLIENT   1
-#define SOCKET_WEB      2
 
 #define MSG_LEVEL_MASK  0x00FF
 #define MSG_COLOR_MASK  0xFF00
@@ -279,8 +278,12 @@ extern char peer_address[128];
 // ---------- Public functions ---------- //
 
 // Win32 uses a different name for some standard functions
+#ifdef _MSC_VER
+	#define strtok_r strtok_s
+#endif
+
 #ifdef WIN32
-# define snprintf    _snprintf
+#define snprintf    _snprintf
 #define TCP_SHUTRECV SD_RECEIVE
 #define TCP_SHUTSEND SD_SEND
 #define TCP_SHUTBOTH SD_BOTH
@@ -300,6 +303,7 @@ extern char peer_address[128];
 #define x_strnicmp     strncasecmp
 #endif
 
+
 #ifndef max
 #define max( x, y ) ( ( ( x ) > ( y ) ) ? ( x ) : ( y ) )
 #define min( x, y ) ( ( ( x ) < ( y ) ) ? ( x ) : ( y ) )
@@ -314,8 +318,6 @@ void SocketError_close(SOCKET_NET socket, int type, int index);
 void PrintPacket(const char *packet, int length);
 
 
-
-
 ////////
 //gspy.c
 //
@@ -325,8 +327,10 @@ int gslist_step_2(/*u8 *secure,*/ u8 *validate, char* browser, int enctype);
 //web.c
 //
 void WEB_Init();
-void WEB_Begin();
-void WEB_HandleResponce(int recvSockIdx);
+void WEB_Cleanup();
+void WEB_PollWebList();
+void WEB_Begin_Send();
+//void WEB_HandleResponce(int recvSockIdx);
 //void WEB_ClearMem();
 //qboolean MAST_parseWebListIPs(const char* webText, int numAllocWebList, int *numwebList);
 

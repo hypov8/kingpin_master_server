@@ -2,3 +2,11 @@
 include/*
 lib/*
 msvc/*
+build/
+*.obj
+*.lib
+*.a
+*.so
+*.pdb
+*.exp
+deps/

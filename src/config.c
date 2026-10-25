@@ -204,7 +204,7 @@ static int CFG_Offline_Parse()
 		c = s[0];
 
 		// Skip comment lines
-		if (isspace(c) || c == '/' ||c == '\\' )
+		if (isspace(c) || c == '/' || c == '\\' || c == '#' )
 			continue;
 
 		//check for port
