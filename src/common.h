@@ -38,9 +38,7 @@
 
 #ifdef _DEBUG
 	//# include <vld.h> //debug mem
-	//#include "windows.h"
 	#include "psapi.h" //mem size
-	//#include <ws2tcpip.h>
 	PROCESS_MEMORY_COUNTERS_EX pmc;
 #endif
 
@@ -62,7 +60,7 @@
 ////////////////
 
 // Version of dpmaster
-#define KP_MASTER_VERSION "1.6.16" //hypov8 version
+#define KP_MASTER_VERSION "1.6.17" //hypov8 version
 
 // Maximum and minimum sizes for a valid packet
 #define MIN_PACKET_SIZE 3 // was 5
@@ -77,9 +75,9 @@
 
 #define MSG_LEVEL_MASK  0x00FF
 #define MSG_COLOR_MASK  0xFF00
-#define MSG_COL_1 (1 <<8)
-#define MSG_COL_2 (1 <<9)
-#define MSG_COL_3 (1 <<10)
+#define MSG_COL_1_RED    (1 <<8)
+#define MSG_COL_2_YELLOW (1 <<9)
+#define MSG_COL_3_BROWN  (1 <<10)
 #define MSG_COL_4 (1 <<11)
 
 #ifdef WIN32
@@ -215,6 +213,13 @@ typedef struct gamesList_s
 }gamesList_t;
 
 
+typedef enum 
+{
+	LIST_WEB,
+	LIST_OFFLINE
+
+}ipListType_t;
+
 
 // A few basic types
 typedef enum
@@ -232,13 +237,18 @@ typedef enum
 	MSG_ERROR,      // errors
 	MSG_WARNING,    // warnings
 	MSG_NORMAL,     // standard messages
-	MSG_DEBUG       // for debugging purpose
+	MSG_DEBUG,      // for debugging purpose
+	MSG_DEBUG_EXT   // for detailed debugging
 } msg_level_t;
 
 typedef struct
 {
-	char  address[ADDRESS_LENGTHMAX];	// hypo dns
-	char  port[PORT_LENGTH];
+	char  address[ADDRESS_LENGTHMAX]; // can be dns
+	char  port[PORT_LENGTH];          // The raw port parsed from the text list
+
+	//ports
+	u_short sin_port_game; // Native port users connect to (31510)
+	u_short sin_port_gspy; // Port used for UDP status query (31510 -10)
 } ipPortList_t;
 
 #ifdef WIN32
@@ -309,6 +319,14 @@ extern char peer_address[128];
 #define min( x, y ) ( ( ( x ) < ( y ) ) ? ( x ) : ( y ) )
 #endif
 
+
+////////
+//common.c
+//
+qboolean Com_isStringComment(char c);
+qboolean Com_GetIpPortFromLine(char *in, char *outIP, char *outPort);
+
+
 //////////
 //master.c
 //
@@ -327,7 +345,7 @@ int gslist_step_2(/*u8 *secure,*/ u8 *validate, char* browser, int enctype);
 //web.c
 //
 void WEB_Init();
-void WEB_Cleanup();
+void WEB_Shutdown();
 void WEB_PollWebList();
 void WEB_Begin_Send();
 //void WEB_HandleResponce(int recvSockIdx);
@@ -340,8 +358,8 @@ void WEB_Begin_Send();
 //
 qboolean CFG_Init();
 void     CFG_ClearMem();
-qboolean CFG_AddServerToList(int numServers, char *ip, char *port);
-void     CFG_PingServerList(int numwebList, qboolean isWebGSPort);
+qboolean CFG_AddServerToList(int numServers, char *ip, char *port, qboolean isGSPort);
+void     CFG_PingServerList(int numwebList, qboolean isGSPort, ipListType_t listType);
 qboolean CFG_Ignore_Check(const char *address);
 void     CFG_Offline_Begin();
 qboolean CFG_IPConvert_Check(void);//add hypov8

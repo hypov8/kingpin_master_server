@@ -63,7 +63,8 @@ typedef struct server_s
 	char            challenge[CHALLENGE_MAX_LENGTH];
 	unsigned short  nbclients;
 	unsigned short  maxclients;
-	unsigned short  gsPort;         //hypov8 store kingpin game port seperate
+	unsigned short  gsPort;         //hypov8 store kingpin game port seperate. can be guessed
+	qboolean        gsPort_valid;   //set true if serve reponded with gs protocol/port
 	qboolean        isWaitResponce; //hypov8 server sent inital commands. so dont send status if timeout low
 	time_t          timeout;
 	time_t          challenge_timeout;
@@ -136,7 +137,7 @@ qboolean        Sv_ResolveAddressMappings(void);
 void			Sv_PingTimeOut_GamePort(void);
 
 //hypo additional ofline list to send ping
-void Sv_PingOfflineList(char *ip, char *port, qboolean isGSpy, const char *message);
+void Sv_PingOfflineList(ipPortList_t *pServer, const char *packet, const char *packetGS);
 
 qboolean Sv_ResolveAddr(const char *name, struct sockaddr_in *addr);//hypo make global
 

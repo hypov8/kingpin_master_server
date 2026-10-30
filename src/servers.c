@@ -150,7 +150,7 @@ qboolean Sv_ResolveAddr(const char *name, struct sockaddr_in *addr)
 	ulAddr = inet_addr(address);	//ipv4 string
 	if (ulAddr != INADDR_NONE && ulAddr != INADDR_ANY)
 	{
-		//ulAddr = ntohl(ulAddr);
+		;//ulAddr = ntohl(ulAddr);
 	}
 	else
 	{	// failed. must be dns
@@ -172,9 +172,7 @@ qboolean Sv_ResolveAddr(const char *name, struct sockaddr_in *addr)
 	}
 
 	// 0.0.0.0 addresses are forbidden
-	if (((ulAddr >> 0) &0xff) == 0 && ((ulAddr >> 8) &0xff) == 0 &&
-		( (ulAddr >> 16)&0xff) == 0 && ((ulAddr >> 24)&0xff) == 0 
-		)
+	if (ulAddr == INADDR_ANY)
 	{
 		MsgPrint(MSG_ERROR, "ERROR: Mapping from or to 0.0.0.0 is forbidden\n");
 		return qfalse;
@@ -198,7 +196,7 @@ qboolean Sv_ResolveAddr(const char *name, struct sockaddr_in *addr)
 		//note: not used anymore. resolved earlier
 		addr->sin_port = htons((u_short)atoi(port)); //add port
 
-	MsgPrint(MSG_DEBUG, "%-21s DNS resolved to %s\n",
+	MsgPrint(MSG_DEBUG_EXT, "%-21s DNS resolved to %s\n",
 			address, inet_ntoa(addr->sin_addr));
 
 	return qtrue;
@@ -519,84 +517,92 @@ Sv_PingOfflineList
 Ping servers from a text file. non public servers
 ====================
 */
-void Sv_PingOfflineList(char *ip, char *port, qboolean isGSpy, const char *packet)
+void Sv_PingOfflineList(ipPortList_t *pServer, const char *packet, const char *packetGS)
 {
 	struct sockaddr_in  tmpServerAddress;
 	server_t           *sv;
-	char                tmpIP[128];
-	int                 nb_bytes;
+	char                tmpIP[ADDRESS_LENGTHMAX + PORT_LENGTH + 4];
+	int                 nb_bytes_gs = 0;
+	int                 nb_bytes_gp = 0;
+	qboolean            validGSpy = 0, gs;
 	time_t              timeDiff;
 	SOCKET_NET          snd_sock = (outSock_udp != INVALID_SOCKET)? outSock_udp : inSock_udp;
-	u_short             uPort = (u_short)atoi(port);
+	u_short             svPort;
 
-	if (!uPort)
+
+	Sv_MemCheck("Sv_PingOfflineList1");
+	 
+	if (!pServer || !pServer->sin_port_game || !pServer->sin_port_gspy) 
 	{
-		snprintf(tmpIP, sizeof(tmpIP), "%s:%s", ip, port);
-		MsgPrint(MSG_WARNING, "%-21s ---> ERROR: Offline port failed\n", tmpIP);
+		if (!pServer)
+			snprintf(tmpIP, sizeof(tmpIP), "%s:%s", "", "");
+		else
+			snprintf(tmpIP, sizeof(tmpIP), "%s:%s", pServer->address, pServer->port);
+		MsgPrint(MSG_WARNING, "%-21s ---> ERROR: Offline server failed\n", tmpIP);
 		return;
 	}
 
-	if (!Sv_ResolveAddr(ip, &tmpServerAddress))
+	//get ip (can be dns), not using port
+	if (!Sv_ResolveAddr(pServer->address, &tmpServerAddress)) {
+		snprintf(tmpIP, sizeof(tmpIP), "%s:%s", pServer->address, pServer->port);
+		MsgPrint(MSG_WARNING, "%-21s ---> ERROR: Offline ResolveAddr failed\n", tmpIP);
 		return;
-
-	tmpServerAddress.sin_port = htons(uPort);
+	}
 
 	// if server is in list. dont ping it again
-	for (sv = Sv_GetFirst(); /* see below */; sv = Sv_GetNext())
+	for (sv = Sv_GetFirst(); sv != NULL; sv = Sv_GetNext())
 	{
-		// No more next server. so ping them
-		if (sv == NULL)
-			break;
-
-		//match server ip?
+		// 1. Compare the IP address
 		if (sv->address.sin_addr.s_addr == tmpServerAddress.sin_addr.s_addr) 
 		{
-			timeDiff = crt_time + TIMEOUT_HEARTBEAT1;
-			if (isGSpy)	
-			{	//match server port?
-				if ( sv->address.sin_port == htons(uPort + 10u) )
-				{
-					if (sv->timeout < timeDiff)
-						break; //found match, but needs update...
+			// Get the tracked game port out of the active server entry
+			svPort = ntohs(sv->address.sin_port);
+			gs = (sv->gsPort && sv->gsPort == pServer->sin_port_gspy);
 
-					snprintf(tmpIP, sizeof(tmpIP), "%s:%hu",
-						inet_ntoa(sv->address.sin_addr), ntohs(sv->address.sin_port));
-					MsgPrint(MSG_DEBUG, "%-21s ---- Existing server. skip \n", tmpIP);
-					return;
+			// 2. Cross-check BOTH ports against the active engine state entry
+			if (svPort == pServer->sin_port_game || gs )
+			{
+				// Entry is stale and needs an update pass. Stop searching.
+				timeDiff = crt_time + TIMEOUT_HEARTBEAT1;
+				if (sv->timeout < timeDiff)
+				{						
+					validGSpy = gs && sv->gsPort_valid;//dont send to game port
+					break; 
 				}
-			}
-			else	
-			{	//match server port?
-				if (sv->address.sin_port == tmpServerAddress.sin_port)	
-				{
-					if (sv->timeout < timeDiff)
-						break; //found match, but needs update...
 
-					snprintf(tmpIP, sizeof(tmpIP), "%s:%hu",
-						inet_ntoa(sv->address.sin_addr), ntohs(sv->address.sin_port));
-					MsgPrint(MSG_DEBUG, "%-21s ---- Existing server. skip \n", tmpIP);
-					return;
-				}
+				// Entry is totally fresh. Log it and skip sending redundant packets.
+				snprintf(tmpIP, sizeof(tmpIP), "%s:%hu", inet_ntoa(sv->address.sin_addr), pServer->sin_port_game);
+				MsgPrint(MSG_DEBUG_EXT, "%-21s ---- Existing server up-to-date. Skip ping.\n", tmpIP);
+				return;
 			}
 		}
 	}
 
-	Sv_MemCheck("__ping1");
 
 	// ping offline servers not in master, or outdated
-	nb_bytes = sendto(snd_sock, packet, strlen(packet), 0, 
+	// --- DUAL PING STRATEGY ---
+	
+	// Probe 1: Send the status packet to the Status/GameSpy Port
+	tmpServerAddress.sin_port = htons(pServer->sin_port_gspy);
+	nb_bytes_gs = sendto(snd_sock, packetGS, strlen(packetGS), 0, 
 		(const struct sockaddr *)&tmpServerAddress, sizeof(tmpServerAddress));
 
-	if (nb_bytes == SOCKET_ERROR){
-		snprintf(tmpIP, sizeof(tmpIP), "%s:%s", ip, port);
-		MsgPrint(MSG_WARNING, "%-21s ---> %-22s error:%i\n",
-			tmpIP, "WARNING: \'sendto\' offlineList\n", ERRORNUM);
+	// Probe 2: Send a fallback status packet directly to the raw Connect/Game Port
+	if (!validGSpy)
+	{
+		tmpServerAddress.sin_port = htons(pServer->sin_port_game);
+		nb_bytes_gp = sendto(snd_sock, packet, strlen(packet), 0, 
+			(const struct sockaddr *)&tmpServerAddress, sizeof(tmpServerAddress));
 	}
 
-	Sv_MemCheck("__ping2");
+	// Error logging based on the primary status port probe result
+	if (nb_bytes_gs == SOCKET_ERROR && (!validGSpy && nb_bytes_gp == SOCKET_ERROR)) {
+		snprintf(tmpIP, sizeof(tmpIP), "%s:%hu", pServer->address, pServer->sin_port_game);
+		MsgPrint(MSG_WARNING, "%-21s ---> WARNING: \'sendto\' offlineList failed. Error: %i\n", tmpIP, ERRORNUM);
+	}
 
+	Sv_MemCheck("Sv_PingOfflineList2");
 }
-
 
 /*
 ====================

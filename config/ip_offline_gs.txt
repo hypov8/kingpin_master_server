@@ -1,0 +1,9 @@
+// offline servers to ping. non dedicated server, wrong master used in server etc..
+// using gamespy port, usualy -10 from game port
+// note: place any dns servers last in list
+//
+// sample list
+//123.123.123.123:31500
+//kp.testserver.com:31500
+//kp.testserver.com:31502
+//192.168.1.123:31500

@@ -13,6 +13,9 @@
     <ClInclude Include="..\src\common.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\web_curl.h">
+      <Filter>src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\master.c">
@@ -31,6 +34,12 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="..\src\gspy.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\common.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\web_curl.c">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
@@ -53,6 +62,9 @@
     <Text Include="..\config\ip_weblist.txt">
       <Filter>config</Filter>
     </Text>
+    <Text Include="..\config\ip_offline_gs.txt">
+      <Filter>config</Filter>
+    </Text>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="src">
@@ -69,6 +81,8 @@
     <None Include="..\resources\icon_master1.2.ico">
       <Filter>resources</Filter>
     </None>
+    <None Include="..\.gitignore" />
+    <None Include="..\README.md" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\resources\Kingpin-master.rc">

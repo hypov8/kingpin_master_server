@@ -99,6 +99,7 @@ static const char *jail_path = DEFAULT_JAIL_PATH;
 static const char *low_priv_user = DEFAULT_LOW_PRIV_USER;
 #endif
 
+static qboolean exitNow = qfalse;
 
 // ---------- Public variables ---------- //
 
@@ -151,7 +152,7 @@ void PrintPacket(const char *packet, int length)
 	}
 
 	pos += snprintf(pket + pos, sizeof(pket) - pos, "\" (%04d bytes)\n", length);
-	MsgPrint(MSG_NOPRINT | MSG_COL_2, "%s", pket);
+	MsgPrint(MSG_NOPRINT | MSG_COL_3_BROWN, "%s", pket);
 }
 
 
@@ -590,7 +591,7 @@ void InitBindSockets(struct sockaddr_in address, SOCKET *sock, unsigned short ma
 		SocketError_close(*sock, 0, 0);
 		*sock = INVALID_SOCKET;
 	}
-	MsgPrint(MSG_NORMAL, "%s port %hu -=(  %s  )=- \n", portMsg, ntohs(address.sin_port), gameMsg);
+	MsgPrint(MSG_NORMAL|MSG_COL_3_BROWN, "%s port %hu -=(  %s  )=- \n", portMsg, ntohs(address.sin_port), gameMsg);
 }
 
 /*
@@ -612,6 +613,10 @@ static qboolean SecureInit(void)
 	if(!Sv_Init())
 		return qfalse;
 
+#ifdef WIN32
+	//console colors
+	hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+#endif
 	MsgPrint(MSG_NORMAL, "-==========================================-\n");
 
 	////////////////////////////////////////////////////////
@@ -621,7 +626,7 @@ static qboolean SecureInit(void)
 	address.sin_family = AF_INET;
 	if(listen_name != NULL)
 	{
-		MsgPrint(MSG_NORMAL, "Listening on address %s (%s) \n", listen_name, inet_ntoa(listen_addr));
+		MsgPrint(MSG_NORMAL|MSG_COL_3_BROWN, "Listening on address %s (%s) \n", listen_name, inet_ntoa(listen_addr));
 		address.sin_addr.s_addr = listen_addr.s_addr;
 	}
 	else
@@ -694,7 +699,7 @@ static qboolean SecureInit(void)
 		{
 			iResult = getsockopt(inSock_udp, SOL_SOCKET, SO_RCVBUF, (void *)&iOptVal, &iOptLen);
 			if (iResult !=SOCKET_ERROR)
-				MsgPrint(MSG_NORMAL, "recv Buf:   %ld \n", iOptVal);
+				MsgPrint(MSG_NORMAL|MSG_COL_3_BROWN, "recv Buf:   %ld \n", iOptVal);
 		}
 
 		iResult = setsockopt(inSock_udp, SOL_SOCKET, SO_SNDBUF, (char *)&bOptVal, bOptLen);
@@ -702,7 +707,7 @@ static qboolean SecureInit(void)
 		{
 			iResult = getsockopt(inSock_udp, SOL_SOCKET, SO_SNDBUF, (char *)&iOptVal, &iOptLen);
 			if (iResult !=SOCKET_ERROR)		
-			MsgPrint(MSG_NORMAL, "rend Buf:   %ld \n", iOptVal);
+			MsgPrint(MSG_NORMAL|MSG_COL_3_BROWN, "send Buf:   %ld \n", iOptVal);
 		}
 
 		//iResult = getsockopt(inSock_udp, SOL_SOCKET, SO_RCVBUF, (char *)&iOptVal, &iOptLen);
@@ -712,18 +717,10 @@ static qboolean SecureInit(void)
 	MsgPrint(MSG_NORMAL, "-==========================================-\n");
 	MsgPrint(MSG_NORMAL, "listen() is OK, I\'m waiting for connections...\n");
 
-
-	//hypo console colors
-#ifdef WIN32
-	//system("COLOR 07");
-	hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
-#endif
-
 	return qtrue;
 } 
 
 
-static qboolean exitNow = qfalse;
 
 /*
 ===============
@@ -777,7 +774,7 @@ static void MAST_GlobalTimedEvent(void)
 	//timeout clients
 	for (i = 0; i < MAX_CLIENTS; i++)	
 	{
-		if ( clientinfo_tcp[i].socknum != INVALID_SOCKET &&
+		if (clientinfo_tcp[i].socknum != INVALID_SOCKET &&
 			clientinfo_tcp[i].timeout > 0 && 
 			clientinfo_tcp[i].timeout < crt_time) //add extra time?
 		{
@@ -943,9 +940,9 @@ int main(int argc, const char *argv[])
 
 	//inital startup. process offline/web_lists
 	CFG_Init();
-	CFG_Offline_Begin(); //must be first then weblist
-
 	WEB_Init();
+
+	CFG_Offline_Begin(); //must be first then weblist
 	WEB_Begin_Send();//GS port first
 	ping_list_time = crt_time + 20; //check next list sooner
 	ping_dns_time = crt_time + REFRESH_TIME_DNS; //5 min
@@ -1035,23 +1032,6 @@ int main(int argc, const char *argv[])
 			recv_sock = outSock_kpq3;
 		}
 #endif
-#if 0
-		else if (webSock_tcp[0] != INVALID_SOCKET &&
-			FD_ISSET(webSock_tcp[0], &rfds))	{
-			isWebList = qtrue;
-			sockWebNum = 0;
-		}
-		else if (webSock_tcp[1] != INVALID_SOCKET &&
-			FD_ISSET(webSock_tcp[1], &rfds))	{
-			isWebList = qtrue;
-			sockWebNum = 1;
-		}
-		else if (webSock_tcp[2] != INVALID_SOCKET &&
-			FD_ISSET(webSock_tcp[2], &rfds))	{
-			isWebList = qtrue;
-			sockWebNum = 2;
-		}
-#endif
 		else
 		{
 			for (i = 0; i < MAX_CLIENTS; i++)
@@ -1067,8 +1047,6 @@ int main(int argc, const char *argv[])
 			if (i >= MAX_CLIENTS)
 				continue; //no data??
 		}
-
-
 
 
 		// Get the next valid message
@@ -1168,14 +1146,6 @@ int main(int argc, const char *argv[])
 				continue;
 			}
 		}
-#if 0
-		else if (isWebList)
-		{
-			MsgPrint(MSG_DEBUG, "WEBLIST: Responce \n");
-			WEB_HandleResponce(sockWebNum);
-			continue;
-		}
-#endif
 		else //UDP
 		{
 			nb_bytes = recvfrom(recv_sock, packet, sizeof(packet) - 1, 0, ( struct sockaddr * )&address, &addrlen);
@@ -1233,7 +1203,6 @@ int main(int argc, const char *argv[])
 		// If we may have to print something, rebuild the peer address buffer
 		if (max_msg_level != MSG_NOPRINT)
 			snprintf(peer_address, sizeof(peer_address), "%s:%hu", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
-
 
 		// We print the packet contents if necessary
 		if(max_msg_level >= MSG_DEBUG)
@@ -1295,7 +1264,7 @@ int main(int argc, const char *argv[])
 	CFG_ClearMem();
 #endif
 
-	WEB_Cleanup();
+	WEB_Shutdown();
 
 	/* allow enough time to spot error */
 	Sys_Sleep(500); //500 milliseconds
@@ -1306,7 +1275,7 @@ int main(int argc, const char *argv[])
 
 static void set_color(int color) 
 {
-#ifdef _WIN32
+#ifdef WIN32
 	if ( !( hStdout == INVALID_HANDLE_VALUE ) )
 		SetConsoleTextAttribute(hStdout, (WORD)color);
 #else
@@ -1353,11 +1322,11 @@ int MsgPrint(int msg_level, const char *format, ...)
 	if(msg_mode  > max_msg_level)
 		return 0; 
 
-	if (msg_mode == MSG_ERROR || color & MSG_COL_1)
+	if (msg_mode == MSG_ERROR || color & MSG_COL_1_RED)
 		set_color(CONSOLE_COLOR_RED);
-	else if (msg_mode == MSG_WARNING)
+	else if (msg_mode == MSG_WARNING || color & MSG_COL_2_YELLOW)
 		set_color(CONSOLE_COLOR_YELLOW);
-	else if (color & MSG_COL_2)
+	else if (color & MSG_COL_3_BROWN)
 		set_color(CONSOLE_COLOR_BROWN);
 	//SetTextColor(1, 3);
 	// SetConsoleTextAttribute();

@@ -422,7 +422,7 @@ static void MSG_RespondToGetServers_GSpyTCP(const struct sockaddr_in *addr, int 
 				peer_address, "getservers Response", numServers);
 
 			MsgPrint(MSG_DEBUG, "================================================= \n");
-			MsgPrint(MSG_DEBUG|MSG_COL_2, "%s \n", printStr);  //hypov8 todo: use PrintPacket());
+			MsgPrint(MSG_DEBUG|MSG_COL_3_BROWN, "%s \n", printStr);  //hypov8 todo: use PrintPacket());
 			MsgPrint(MSG_DEBUG, "================================================= \n");
 
 			// If we're done
@@ -1026,7 +1026,7 @@ static qboolean MSG_HandleMessageInfo_isPrivate(const char *msg, const struct so
 }
 
 static server_t *MSG_AddNewServer(const struct sockaddr_in *address, 
-	int protocol, int gsPortNum, char *queryMsg)
+	int protocol, u_short gsPortNum, char *queryMsg)
 {
 	server_t *server;
 
@@ -1044,7 +1044,10 @@ static server_t *MSG_AddNewServer(const struct sockaddr_in *address,
 			server->gsPort = ntohs(server->address.sin_port) - (u_short)10u; //gamespy port. (usualy -10)
 	}
 	else
-		server->gsPort = (u_short)gsPortNum;
+	{
+		server->gsPort = gsPortNum; //was gamespy packet
+		server->gsPort_valid = qtrue;
+	}
 	server->active = qtrue;
 	server->protocol = protocol;
 	server->timeout = crt_time + TIMEOUT_HEARTBEAT2;

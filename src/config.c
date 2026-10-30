@@ -22,6 +22,13 @@ typedef struct
 	char  address[ADDRESS_LENGTH];	// Dotted quad
 } ignoreAddress_t;
 
+typedef struct
+{
+	int           count;
+	SOCKET_NET    sock;
+	ipPortList_t *list; // Stores only the DNS/domain items
+} asyncDNSList_t;
+
 
 // ---------- Private variables ---------- //
 
@@ -29,14 +36,19 @@ typedef struct
 static int              ignoreAddresses_count = 10;
 static ignoreAddress_t* ignoreAddresses = NULL;
 
-static const char *ipIgnoreFile_Name   = "ip_ignore.txt";
-static const char *ipConvertFile_Name  = "ip_rename.txt"; //hypov8 ip rename
-static const char *ipOfflineFile_Name  = "ip_offline.txt"; //hypov8 ip rename
+static const char *ipIgnoreFile_Name           = "ip_ignore.txt";
+static const char *ipConvertFile_Name          = "ip_rename.txt"; //ip rename
+static const char *ipOfflineFileName_gamePort  = "ip_offline.txt";
+static const char *ipOfflineFileName_gameSpy   = "ip_offline_gs.txt";
 
-static int serverListsToPing_count = 16; //init
+//last request type. use gamespy or Game protocol
+
+static ipPortList_t *serverListsToPing = NULL;
+static int           serverListsToPing_count = 64; //init
+
+
 // ---------- Public variables ---------- //
 
-ipPortList_t *serverListsToPing = NULL;
 
 
 // ---------- Private functions ---------- //
@@ -152,16 +164,18 @@ static qboolean CFG_Ignore_parseAddress(void)
 	return num_ignore;
 }
 
-
-
-qboolean CFG_AddServerToList(int numServers, char *ip, char *port)
+qboolean CFG_GrowServerList(int numServers)
 {
 	// Make list bigger. if needed
 	if (numServers >= serverListsToPing_count)
 	{
 		ipPortList_t *tmp_ptr;
 
-		serverListsToPing_count *= 2;
+		if (serverListsToPing_count == 0)
+			serverListsToPing_count = 32;
+		else
+			serverListsToPing_count *= 2;
+
 		tmp_ptr = serverListsToPing;
 		serverListsToPing = realloc(serverListsToPing, sizeof(ipPortList_t) * serverListsToPing_count);
 
@@ -171,10 +185,35 @@ qboolean CFG_AddServerToList(int numServers, char *ip, char *port)
 			return qfalse;
 		}
 	}
+	return qtrue;
+}
+
+qboolean CFG_AddServerToList(int svIndex, char *ip, char *port, qboolean isGSPort)
+{
+	u_short parsedPort;
+
+	if (!CFG_GrowServerList(svIndex))
+		return qfalse;
 
 	//add server
-	strcpy(serverListsToPing[numServers].address, ip);
-	strcpy(serverListsToPing[numServers].port, port);
+	strcpy(serverListsToPing[svIndex].address, ip); //ADDRESS_LENGTHMAX
+	strcpy(serverListsToPing[svIndex].port, port);  //PORT_LENGTH
+
+	parsedPort = (u_short)atoi(port);
+
+	// Map the dual-port relationships immediately on ingestion ---
+	if (isGSPort)
+	{
+		// The web list provided the GameSpy Status port
+		serverListsToPing[svIndex].sin_port_gspy = parsedPort;
+		serverListsToPing[svIndex].sin_port_game = parsedPort + 10u; // Game port is 10 higher
+	}
+	else
+	{
+		// The web list provided the raw Connect/Game port
+		serverListsToPing[svIndex].sin_port_game = parsedPort;
+		serverListsToPing[svIndex].sin_port_gspy = parsedPort - 10u; // Status port is 10 lower
+	}
 
 	return qtrue;
 }
@@ -187,47 +226,43 @@ CFG_Offline_Parse
 hypo offline list to ping
 ====================
 */
-static int CFG_Offline_Parse()
+static int CFG_Offline_Parse(qboolean isGSPort)
 {
 	FILE *f = NULL;
-	char *portPtr, c, s[ADDRESS_LENGTHMAX], p[PORT_LENGTH];
-	int   j, numOfflineList = 0;
+	char  buff[ADDRESS_LENGTHMAX];
+	char  bufferIP[ADDRESS_LENGTHMAX], bufferPort[PORT_LENGTH];
+	int   numOfflineList = 0;
+	const char *filename;
 
-	MsgPrint(MSG_DEBUG, "Loading... %s\n", ipOfflineFile_Name);
-	f = fopen(ipOfflineFile_Name, "r");
+	if (isGSPort)
+		filename = ipOfflineFileName_gameSpy;
+	else
+		filename = ipOfflineFileName_gamePort;
+
+	MsgPrint(MSG_DEBUG, "Loading... %s\n", filename);
+	f = fopen(filename, "r");
 	if (!f)
+	{
+		MsgPrint(MSG_WARNING, "Cant open %s\n", filename);
 		return -1;
+	}
 
 	//loop through each line
-	while (fgets(s, ADDRESS_LENGTHMAX, f) != NULL)// && !feof(f))
+	while (fgets(buff, ADDRESS_LENGTHMAX, f) != NULL)// && !feof(f))
 	{
-		c = s[0];
-
-		// Skip comment lines
-		if (isspace(c) || c == '/' || c == '\\' || c == '#' )
+		//get adderess, handle invalid chars
+		if (!Com_GetIpPortFromLine(buff, bufferIP, bufferPort)) {
 			continue;
-
-		//check for port
-		portPtr = strstr(s, ":");
-		if (portPtr == NULL)	
-			continue;	//hypov8 todo error message??
-
-		*portPtr++ = '\0'; //ternimate ip string
-		memset(p, 0, PORT_LENGTH);
-		for (j = 0; j < PORT_LENGTH-1; j++) 
-		{
-			c = portPtr[0];
-			if (!c || isspace(c) || c == '/') 
-				break;
-			p[j] = c;
-			portPtr++;
 		}
 
 		//copy port and ip to list
-		if (!CFG_AddServerToList(numOfflineList, s, p))
-			break;
+		if (bufferIP[0] != '\0')
+		{
+			if (!CFG_AddServerToList(numOfflineList, bufferIP, bufferPort, isGSPort))
+				break; //failed to expand list
 
-		numOfflineList += 1;
+			numOfflineList += 1;
+		}
 
 		if (feof(f))
 			break;
@@ -240,34 +275,164 @@ static int CFG_Offline_Parse()
 
 
 
+// The thread worker function (Cross-Platform)
+#ifdef _WIN32
+static DWORD WINAPI ThreadedDNSResolverPump(LPVOID lpParam)
+#else
+static void *ThreadedDNSResolverPump(void *lpParam)
+#endif
+{
+	asyncDNSList_t *cargo = (asyncDNSList_t *)lpParam;
+	struct sockaddr_in addr;
+	int i;
+
+	for (i = 0; i < cargo->count; i++)
+	{
+		ipPortList_t *srv = &cargo->list[i];
+
+		// This handles the blocking gethostbyname calls safely in the background
+		if (!Sv_ResolveAddr(srv->address, &addr))
+			continue;
+
+		// Probe 1: GameSpy Port
+		addr.sin_port = htons(srv->sin_port_gspy);
+		sendto(cargo->sock, M2S_GETSTATUS_GS, strlen(M2S_GETSTATUS_GS), 0, (struct sockaddr *)&addr, sizeof(addr));
+
+		// Probe 2: Game Port
+		addr.sin_port = htons(srv->sin_port_game);
+		sendto(cargo->sock, M2S_GETSTATUS_YYYY, strlen(M2S_GETSTATUS_YYYY), 0, (struct sockaddr *)&addr, sizeof(addr));
+	}
+
+	free(cargo->list);
+	free(cargo);
+	return 0;
+}
+
+
+static void CFG_SendToThread_offline(SOCKET_NET snd_sock, int dnsCount, asyncDNSList_t *cargo)
+{
+	cargo->count = dnsCount;
+	cargo->sock  = snd_sock;
+
+#ifdef _WIN32
+	HANDLE hThread = CreateThread(NULL, 0, ThreadedDNSResolverPump, cargo, 0, NULL);
+	if (hThread != NULL) 
+	{
+		CloseHandle(hThread); // Detach instantly on Windows
+	} 
+	else 
+	{
+		free(cargo->list); 
+		free(cargo);
+	}
+#else
+	pthread_t threadId;
+	if (pthread_create(&threadId, NULL, ThreadedDNSResolverPump, cargo) == 0) 
+	{
+		pthread_detach(threadId); // Detach instantly on Linux
+	} 
+	else 
+	{
+		free(cargo->list); 
+		free(cargo);
+	}
+#endif
+}
+
+
+
 // ---------- Public functions ---------- //
 
 
-void CFG_PingServerList(int numwebList, qboolean isWebGSPort)
+void CFG_PingServerList(int numwebList, qboolean isGSPort, ipListType_t listType)
 {
 	int i;
-	char *message;
+	char *prefix, *portType, *query, tmpIP[ADDRESS_LENGTHMAX + PORT_LENGTH + 4];
+	int dnsCount = 0;
+	SOCKET_NET snd_sock = (outSock_udp != INVALID_SOCKET) ? outSock_udp : inSock_udp;
+	asyncDNSList_t *cargo = NULL;
 
-	if (numwebList)
+	if (!numwebList || serverListsToPing == NULL)
+		return;
+
+	switch (listType)
 	{
-		if (isWebGSPort)
+		default:
+		case LIST_WEB:     prefix = "HTTP "; break;
+		case LIST_OFFLINE: prefix = "LOCAL"; break;
+	}
+	query = isGSPort? "\'\\\\status\\\\\'": "\'yyyystatus\'";
+	portType = isGSPort? "GSpy" : "Game";
+
+	MsgPrint(MSG_NORMAL, "LOADING IP-LIST: Src: %s  Port: %s  Count: %-3d  Query: %s \n", 
+		prefix, portType, numwebList, query);
+
+
+	for ( i = 0; i < numwebList; i++ )
+	{
+		ipPortList_t *pServer = &serverListsToPing[i];
+		u_long ulAddr = inet_addr(pServer->address);
+
+		//let ipv4 process
+		if (ulAddr != INADDR_NONE && ulAddr != INADDR_ANY)
 		{
-			message = M2S_GETSTATUS_GS;
-			MsgPrint(MSG_NORMAL, 
-				"LIST-GS:  Sending \'\\\\status\\\\\' to %3d servers\n", numwebList);
+			Sv_PingOfflineList(pServer, M2S_GETSTATUS_YYYY, M2S_GETSTATUS_GS);
 		}
 		else
 		{
-			message = M2S_GETSTATUS_YYYY;
-			MsgPrint(MSG_NORMAL, 
-				"LIST-GP:  Sending \'yyyystatus\' to %3d servers\n", numwebList);
-		}
+			//offload dns lookups. can pause main thread.
+			//valid?
+			if (!pServer || !pServer->sin_port_game || !pServer->sin_port_gspy)
+			{
+				if (!pServer)
+					snprintf(tmpIP, sizeof(tmpIP), "%s:%s", "", "");
+				else
+					snprintf(tmpIP, sizeof(tmpIP), "%s:%s", pServer->address, pServer->port);
+				MsgPrint(MSG_WARNING, "%-21s ---> ERROR: Offline server failed\n", tmpIP);
+				continue;
+			}
 
-		for ( i = 0; i < numwebList; i++ )
-		{
-			Sv_PingOfflineList(serverListsToPing[i].address, serverListsToPing[i].port, 
-				isWebGSPort, message);
+			//failed alloc
+			if (dnsCount < 0)
+				continue; 
+
+			if (dnsCount == 0 && cargo == NULL)
+			{
+				cargo = malloc(sizeof(asyncDNSList_t));
+				if (!cargo)
+				{
+					dnsCount = -1;
+					continue;
+				}
+
+				cargo->list = malloc(sizeof(ipPortList_t) * (numwebList - i)); //todo sort offline with dns last
+				if (!cargo->list) 
+				{
+					free(cargo);
+					dnsCount = -1;
+					continue;
+				}
+			}
+
+			if (cargo != NULL)
+			{
+				memcpy(&cargo->list[dnsCount], pServer, sizeof(ipPortList_t));
+				dnsCount++;
+			}
 		}
+	}
+
+
+	// 3. Deployed the deferred domains to the background thread pool
+	if (dnsCount > 0 && cargo != NULL)
+	{
+		CFG_SendToThread_offline(snd_sock, dnsCount, cargo);
+	}
+	else if (cargo != NULL)
+	{	//just incase..
+		if (cargo->list) 
+			free(cargo->list);
+		free(cargo);
 	}
 }
 
@@ -315,7 +480,7 @@ Load offline list
 */
 void CFG_Offline_Begin()
 {
-	//int numAllocOfflineList = 3;
+	static qboolean isGSPort = qfalse; //this will get gamespy lists first
 	int numOfflineList = 0;
 
 	MsgPrint(MSG_DEBUG, "Processing Offline List\n");
@@ -323,12 +488,14 @@ void CFG_Offline_Begin()
 	if (!serverListsToPing)
 		return;
 
+	isGSPort = !isGSPort; //switch between GS and Gameport
+
 	Sv_MemCheck("load offline begin");
 
-	numOfflineList = CFG_Offline_Parse();
+	numOfflineList = CFG_Offline_Parse(isGSPort);
 	if (numOfflineList >0)
 	{
-		CFG_PingServerList(numOfflineList, qfalse);
+		CFG_PingServerList(numOfflineList, isGSPort, LIST_OFFLINE);
 	}
 	else if (numOfflineList == -1)
 	{	// Couldn't parse, offline list
@@ -336,7 +503,6 @@ void CFG_Offline_Begin()
 	}
 
 	Sv_MemCheck("load offline end");
-
 }
 
 
@@ -443,10 +609,6 @@ void CFG_ClearMem()
 	if (ignoreAddresses != NULL)
 		free(ignoreAddresses);
 
-	/*if (offlineAddresses != NULL)
-		free(offlineAddresses);*/
-
 	if (serverListsToPing != NULL)
 		free(serverListsToPing);
-
 }

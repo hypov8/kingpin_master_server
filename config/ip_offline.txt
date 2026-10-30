@@ -1,5 +1,7 @@
 // offline servers to ping. non dedicated server, wrong master used in server etc..
 //
+// note: place any dns servers last in list
+//
 //123.123.123.123:31510
 //kp.testserver.com:31510
 //kp.testserver.com:31512
