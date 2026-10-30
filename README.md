@@ -1,4 +1,4 @@
-# Kingpin Master Server
+﻿# Kingpin Master Server
 
 A lightweight master server implementation optimized for Kingpin, based on the DPMaster architecture.
 
@@ -10,7 +10,7 @@ A lightweight master server implementation optimized for Kingpin, based on the D
 
 ## Compilation & Installation
 
-### ?? Linux (Ubuntu / Debian)
+### 🐧 Linux (Ubuntu / Debian)
 
 Install dependencies and compile using the provided Makefile:
 ```bash
@@ -22,7 +22,7 @@ The compiled executable will be placed in `bin/master` alongside your configurat
 
 ---
 
-### ?? Windows (MSVC / Visual Studio)
+### 🪟 Windows (MSVC / Visual Studio)
 
 1. Open the solution file in Visual Studio.
 2. Change your active build configuration to **`Release_curl_dll`**.

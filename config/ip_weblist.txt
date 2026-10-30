@@ -2,5 +2,5 @@
 // MAX is 3 addresses
 // Game Port listings (31510)
 //
-https://hambloch.com/kingpin/servers_active.php?gameport=1
+//https://hambloch.com/kingpin/servers_active.php?gameport=1
 https://raw.githubusercontent.com/shavargo/kingpin-servers-mirror/main/servers.txt

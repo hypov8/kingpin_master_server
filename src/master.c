@@ -766,7 +766,7 @@ Things to do while nothing is going on
 */
 static void MAST_GlobalTimedEvent(void)
 {
-	static short listIdx = 1; //get gameport 1st
+	static short listIdx = 1; //get gameport(web) 1st
 	int i;
 
 	Sv_MemCheck("timed event start");
@@ -814,7 +814,7 @@ static void MAST_GlobalTimedEvent(void)
 		}
 
 		listIdx += 1;
-		if (listIdx >= 3)
+		if (listIdx > 1)
 			listIdx = 0;
 
 		//update next refresh time
@@ -939,11 +939,12 @@ int main(int argc, const char *argv[])
 	}
 
 	//inital startup. process offline/web_lists
-	CFG_Init();
-	WEB_Init();
+	CFG_Init(); //allocate offline/ignore lists
+	WEB_Init(); //startup curl/winhttp
 
-	CFG_Offline_Begin(); //must be first then weblist
-	WEB_Begin_Send();//GS port first
+	CFG_Offline_Begin(); //read ip_offline_gs.txt
+	WEB_Begin_Send();    //read ip_weblist_gs.txt
+
 	ping_list_time = crt_time + 20; //check next list sooner
 	ping_dns_time = crt_time + REFRESH_TIME_DNS; //5 min
 

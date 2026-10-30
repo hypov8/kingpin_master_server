@@ -3,5 +3,4 @@
 // Gamespy Port listings. -10 game port (31500)
 //
 //www.qtracker.com/server_list_details.php?game=kingpin
-//https://hambloch.com/kingpin/servers_active.php
-//
+https://hambloch.com/kingpin/servers_active.php
